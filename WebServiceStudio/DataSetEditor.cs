@@ -39,7 +39,7 @@ namespace WebServiceStudio
             private Button Cancel;
             private Button LoadXml;
             private Button OK;
-            private DataGrid dataGrid1;
+            private DataGridView dataGrid1;
             private Label label1;
             private Panel panelBottomMain;
             private Panel panelTopMain;
@@ -92,7 +92,7 @@ namespace WebServiceStudio
                 Cancel = new Button();
                 OK = new Button();
                 LoadXml = new Button();
-                dataGrid1 = new DataGrid();
+                dataGrid1 = new DataGridView();
                 panelTopMain = new Panel();
                 panelBottomMain = new Panel();
                 panelTopMain.SuspendLayout();
@@ -125,12 +125,12 @@ namespace WebServiceStudio
                 LoadXml.TabIndex = 1;
                 LoadXml.Text = "Load XML...";
                 LoadXml.Click += LoadXml_Click;
-                dataGrid1.CaptionVisible = true;
+               // dataGrid1.CaptionVisible = true;
                 dataGrid1.DataMember = "";
                 dataGrid1.Name = "dataGrid1";
                 dataGrid1.Dock = DockStyle.Fill;
                 dataGrid1.TabIndex = 4;
-                dataGrid1.Navigate += dataGrid1_Navigate;
+               // dataGrid1.Na += dataGrid1_Navigate;
                 panelTopMain.BorderStyle = BorderStyle.None;
                 panelTopMain.Controls.AddRange(new Control[] {label1, Cancel, OK, LoadXml});
                 panelTopMain.Dock = DockStyle.Top;
@@ -153,7 +153,7 @@ namespace WebServiceStudio
                 Text = "Form1";
                 base.FormBorderStyle = FormBorderStyle.Fixed3D;
                 base.Load += EditForm_Load;
-                dataGrid1.EndInit();
+                dataGrid1.ResumeLayout();
                 base.ResumeLayout(false);
             }
 
