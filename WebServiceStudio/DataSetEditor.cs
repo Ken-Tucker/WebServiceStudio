@@ -125,12 +125,10 @@ namespace WebServiceStudio
                 LoadXml.TabIndex = 1;
                 LoadXml.Text = "Load XML...";
                 LoadXml.Click += LoadXml_Click;
-               // dataGrid1.CaptionVisible = true;
                 dataGrid1.DataMember = "";
                 dataGrid1.Name = "dataGrid1";
                 dataGrid1.Dock = DockStyle.Fill;
                 dataGrid1.TabIndex = 4;
-               // dataGrid1.Na += dataGrid1_Navigate;
                 panelTopMain.BorderStyle = BorderStyle.None;
                 panelTopMain.Controls.AddRange(new Control[] {label1, Cancel, OK, LoadXml});
                 panelTopMain.Dock = DockStyle.Top;
