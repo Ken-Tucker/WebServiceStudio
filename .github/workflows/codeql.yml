@@ -37,7 +37,7 @@ jobs:
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
-        config-file: .github/codeql/codeql-config.yml  # <-- add this line
+        config-file: ./.github/codeql/codeql-config.yml  # <-- add this line
       # Override language selection by uncommenting this and choosing your languages
       # with:
       #   languages: go, javascript, csharp, python, cpp, java
