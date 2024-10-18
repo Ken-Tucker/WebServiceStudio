@@ -31,7 +31,6 @@ jobs:
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
-        #config-file: .github/codeql/codeql-config.yml  # <-- add this line
         languages: csharp
 
     # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
@@ -44,7 +43,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.2
+      uses: microsoft/setup-msbuild@v2
 
     - name: Restore NuGet packages
       run: nuget restore .\WebServiceStudio.sln
