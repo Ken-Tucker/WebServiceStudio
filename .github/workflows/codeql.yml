@@ -46,12 +46,12 @@ jobs:
       uses: microsoft/setup-msbuild@v1.0.2
 
     - name: Restore NuGet packages
-      run: nuget restore webservicestudio.csproj
+      run: nuget restore .\WebServiceStudio.sln
 
     - name: Build
       # Add additional options to the MSBuild command line here (like platform or verbosity level).
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
-      run: msbuild /m /p:Configuration=release webservicestudio.csproj
+      run: msbuild /m /p:Configuration=release .\WebServiceStudio.sln
       
 
     - name: Perform CodeQL Analysis
