@@ -33,13 +33,6 @@ jobs:
       with:
         languages: csharp
 
-    # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
-    # If this step fails, then you should remove it and run the build manually (see below)
-
-  build:
-    runs-on: windows-latest
-
-    steps:
     - name: Checkout repository
       uses: actions/checkout@v4
     - name: Add MSBuild to PATH
