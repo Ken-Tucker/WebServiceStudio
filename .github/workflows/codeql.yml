@@ -22,7 +22,7 @@ on:
 jobs:
   analyse:
     name: Analyse
-    runs-on: windows-2022
+    runs-on: windows-latest
 
     steps:
     - name: Checkout repository
@@ -33,9 +33,7 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         config-file: ./.github/codeql/codeql-config.yml  # <-- add this line
-      # Override language selection by uncommenting this and choosing your languages
-      # with:
-      #   languages: go, javascript, csharp, python, cpp, java
+        languages: csharp
 
     # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)
@@ -48,15 +46,15 @@ jobs:
       uses: microsoft/setup-msbuild@v1.0.2
 
     - name: Restore NuGet packages
-      run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+      run: nuget restore webservicestudio.csproj
 
     - name: Build
       # Add additional options to the MSBuild command line here (like platform or verbosity level).
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
-      run: msbuild /m /p:Configuration=release 
+      run: msbuild /m /p:Configuration=release webservicestudio.csproj
       
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
       with:
-        category: "/language:${{matrix.language}}"
+        category: "/language:csharp"
