@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.CSharp;
+using Microsoft.VisualBasic;
+using System;
 using System.CodeDom;
 using System.CodeDom.Compiler;
 using System.Collections;
@@ -13,8 +15,6 @@ using System.Web.Services.Discovery;
 using System.Xml;
 using System.Xml.Schema;
 using System.Xml.Serialization;
-using Microsoft.CSharp;
-using Microsoft.VisualBasic;
 
 namespace WebServiceStudio
 {
@@ -197,7 +197,7 @@ namespace WebServiceStudio
                         bool flag = false;
                         foreach (CodeAttributeDeclaration declaration2 in declaration.CustomAttributes)
                         {
-                            if (declaration2.Name == typeof (WebServiceBindingAttribute).FullName)
+                            if (declaration2.Name == typeof(WebServiceBindingAttribute).FullName)
                             {
                                 flag = true;
                                 break;
@@ -225,7 +225,7 @@ namespace WebServiceStudio
             XmlSchemaObjectEnumerator enumerator = schema.Includes.GetEnumerator();
             while (enumerator.MoveNext())
             {
-                var current = (XmlSchemaExternal) enumerator.Current;
+                var current = (XmlSchemaExternal)enumerator.Current;
                 string schemaLocation = current.SchemaLocation;
                 if (current is XmlSchemaImport)
                 {
@@ -240,7 +240,7 @@ namespace WebServiceStudio
                         includeSchemas[str2] = schema2;
                         CollectIncludes(schema2, includeSchemas);
                     }
-                    current.Schema = (XmlSchema) includeSchemas[str2];
+                    current.Schema = (XmlSchema)includeSchemas[str2];
                     current.SchemaLocation = null;
                 }
             }
@@ -300,19 +300,19 @@ namespace WebServiceStudio
                     break;
 
                 default:
-                {
-                    if (language != Language.Custom)
                     {
-                        throw new Exception("Unknown language");
+                        if (language != Language.Custom)
+                        {
+                            throw new Exception("Unknown language");
+                        }
+                        Type type = Type.GetType(WsdlProperties.CustomCodeDomProvider);
+                        if (type == null)
+                        {
+                            throw new TypeLoadException("Type '" + WsdlProperties.CustomCodeDomProvider + "' is not found");
+                        }
+                        codeProvider = (CodeDomProvider)Activator.CreateInstance(type);
+                        break;
                     }
-                    Type type = Type.GetType(WsdlProperties.CustomCodeDomProvider);
-                    if (type == null)
-                    {
-                        throw new TypeLoadException("Type '" + WsdlProperties.CustomCodeDomProvider + "' is not found");
-                    }
-                    codeProvider = (CodeDomProvider) Activator.CreateInstance(type);
-                    break;
-                }
             }
             if (codeProvider != null)
             {
@@ -589,7 +589,7 @@ namespace WebServiceStudio
             importer.ProtocolName = WsdlProperties.Protocol.ToString();
             var namespace2 = new CodeNamespace(proxyNamespace);
             compileUnit.Namespaces.Add(namespace2);
-            ServiceDescriptionImportWarnings warnings = importer.Import(namespace2, compileUnit);
+            _ = importer.Import(namespace2, compileUnit);
             try
             {
                 try
@@ -752,7 +752,7 @@ namespace WebServiceStudio
                 string current = enumerator.Current;
                 try
                 {
-                    DiscoveryDocument document = client.DiscoverAny(current);
+                    _ = client.DiscoverAny(current);
                     client.ResolveAll();
                 }
                 catch (Exception exception)
@@ -763,8 +763,8 @@ namespace WebServiceStudio
             IDictionaryEnumerator enumerator2 = client.Documents.GetEnumerator();
             while (enumerator2.MoveNext())
             {
-                var entry = (DictionaryEntry) enumerator2.Current;
-                AddDocument((string) entry.Key, entry.Value, schemas, descriptions);
+                var entry = (DictionaryEntry)enumerator2.Current;
+                AddDocument((string)entry.Key, entry.Value, schemas, descriptions);
             }
         }
 

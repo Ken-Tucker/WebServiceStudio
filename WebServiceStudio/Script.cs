@@ -65,7 +65,7 @@ namespace WebServiceStudio
 
         private CodeExpression BuildArray(CodeStatementCollection statements, string name, object value)
         {
-            var array = (Array) value;
+            var array = (Array)value;
             Type type = value.GetType();
             string uniqueVariableName = GetUniqueVariableName(name, statements);
             var statement = new CodeVariableDeclarationStatement(type.FullName, uniqueVariableName);
@@ -95,22 +95,20 @@ namespace WebServiceStudio
                 MemberInfo info in type.GetMembers(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance))
             {
                 object obj2 = null;
-                Type fieldType = typeof (object);
                 CodeExpression left = null;
                 if (info is FieldInfo)
                 {
-                    var info2 = (FieldInfo) info;
+                    var info2 = (FieldInfo)info;
                     if (info2.IsStatic || info2.IsInitOnly)
                     {
                         goto Label_014B;
                     }
-                    fieldType = info2.FieldType;
                     obj2 = info2.GetValue(value);
                     left = new CodeFieldReferenceExpression(targetObject, info2.Name);
                 }
                 else if (info is PropertyInfo)
                 {
-                    var info3 = (PropertyInfo) info;
+                    var info3 = (PropertyInfo)info;
                     if (!info3.CanWrite)
                     {
                         goto Label_014B;
@@ -120,7 +118,6 @@ namespace WebServiceStudio
                     {
                         goto Label_014B;
                     }
-                    fieldType = info3.PropertyType;
                     obj2 = info3.GetValue(value, null);
                     left = new CodePropertyReferenceExpression(targetObject, info3.Name);
                 }
@@ -129,7 +126,7 @@ namespace WebServiceStudio
                     CodeExpression right = BuildObject(statements, info.Name, obj2);
                     statements.Add(new CodeAssignStatement(left, right));
                 }
-                Label_014B:
+            Label_014B:
                 ;
             }
             return targetObject;
@@ -158,7 +155,7 @@ namespace WebServiceStudio
             var expression = new CodeMethodInvokeExpression(BuildProxy(method2.Statements, method), method.Name,
                 new CodeExpression[0]);
             BuildParameters(method2.Statements, method, parameters, expression.Parameters);
-            if (method.ReturnType == typeof (void))
+            if (method.ReturnType == typeof(void))
             {
                 method2.Statements.Add(new CodeExpressionStatement(expression));
             }
@@ -176,7 +173,7 @@ namespace WebServiceStudio
                 if (info.IsOut || info.ParameterType.IsByRef)
                 {
                     BuildDumpInvoke(method2.Statements, info.Name,
-                        ((CodeDirectionExpression) expression.Parameters[i]).Expression);
+                        ((CodeDirectionExpression)expression.Parameters[i]).Expression);
                 }
             }
         }
@@ -188,13 +185,13 @@ namespace WebServiceStudio
                 return new CodePrimitiveExpression(null);
             }
             Type c = value.GetType();
-            if (c.IsPrimitive || (c == typeof (string)))
+            if (c.IsPrimitive || (c == typeof(string)))
             {
                 return new CodePrimitiveExpression(value);
             }
             if (c.IsEnum)
             {
-                string[] strArray = value.ToString().Split(new[] {','});
+                string[] strArray = value.ToString().Split(new[] { ',' });
                 if (strArray.Length > 1)
                 {
                     CodeExpression left = new CodeFieldReferenceExpression(new CodeTypeReferenceExpression(c.FullName),
@@ -208,18 +205,18 @@ namespace WebServiceStudio
                 }
                 return new CodeFieldReferenceExpression(new CodeTypeReferenceExpression(c.FullName), value.ToString());
             }
-            if (c == typeof (DateTime))
+            if (c == typeof(DateTime))
             {
-                var time = (DateTime) value;
-                string str = ((DateTime) value).ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzzzzz",
+                var time = (DateTime)value;
+                string str = ((DateTime)value).ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzzzzz",
                     DateTimeFormatInfo.InvariantInfo);
                 long ticks = time.Ticks;
                 statements.Add(new CodeCommentStatement("Init DateTime object value = " + str));
                 statements.Add(new CodeCommentStatement("We going to use DateTime ctor that takes Ticks"));
-                return new CodeObjectCreateExpression(new CodeTypeReference(typeof (DateTime)),
-                    new CodeExpression[] {new CodePrimitiveExpression(ticks)});
+                return new CodeObjectCreateExpression(new CodeTypeReference(typeof(DateTime)),
+                    new CodeExpression[] { new CodePrimitiveExpression(ticks) });
             }
-            if (typeof (XmlNode).IsAssignableFrom(c))
+            if (typeof(XmlNode).IsAssignableFrom(c))
             {
                 return BuildXmlNode(statements, name, value);
             }
@@ -302,7 +299,7 @@ namespace WebServiceStudio
             for (int i = 0; i < soapHeaders.Length; i++)
             {
                 FieldInfo info = soapHeaders[i];
-                if (typeof (SoapHeader).IsAssignableFrom(info.FieldType))
+                if (typeof(SoapHeader).IsAssignableFrom(info.FieldType))
                 {
                     CodeExpression left = new CodeFieldReferenceExpression(targetObject, info.Name);
                     CodeExpression right = BuildObject(statements, info.Name, info.GetValue(proxy));
@@ -315,12 +312,12 @@ namespace WebServiceStudio
         private CodeExpression BuildXmlNode(CodeStatementCollection statements, string name, object value)
         {
             Type type = value.GetType();
-            if (type == typeof (XmlElement))
+            if (type == typeof(XmlElement))
             {
-                var element = (XmlElement) value;
+                var element = (XmlElement)value;
                 string str = GetUniqueVariableName(name + "Doc", statements);
-                var statement = new CodeVariableDeclarationStatement(typeof (XmlDocument), str);
-                statement.InitExpression = new CodeObjectCreateExpression(typeof (XmlDocument), new CodeExpression[0]);
+                var statement = new CodeVariableDeclarationStatement(typeof(XmlDocument), str);
+                statement.InitExpression = new CodeObjectCreateExpression(typeof(XmlDocument), new CodeExpression[0]);
                 statements.Add(statement);
                 var expression = new CodeVariableReferenceExpression(str);
                 var expression2 = new CodeMethodInvokeExpression(expression, "LoadXml", new CodeExpression[0]);
@@ -328,21 +325,21 @@ namespace WebServiceStudio
                 statements.Add(expression2);
                 return new CodeFieldReferenceExpression(expression, "DocumentElement");
             }
-            if (type != typeof (XmlAttribute))
+            if (type != typeof(XmlAttribute))
             {
                 throw new Exception("Unsupported XmlNode type");
             }
-            var attribute = (XmlAttribute) value;
+            var attribute = (XmlAttribute)value;
             string uniqueVariableName = GetUniqueVariableName(name + "Doc", statements);
-            var statement2 = new CodeVariableDeclarationStatement(typeof (XmlDocument), uniqueVariableName);
-            statement2.InitExpression = new CodeObjectCreateExpression(typeof (XmlDocument), new CodeExpression[0]);
+            var statement2 = new CodeVariableDeclarationStatement(typeof(XmlDocument), uniqueVariableName);
+            statement2.InitExpression = new CodeObjectCreateExpression(typeof(XmlDocument), new CodeExpression[0]);
             statements.Add(statement2);
             var targetObject = new CodeVariableReferenceExpression(uniqueVariableName);
             var expression4 = new CodeMethodInvokeExpression(targetObject, "CreateAttribute", new CodeExpression[0]);
             expression4.Parameters.Add(new CodePrimitiveExpression(attribute.Name));
             expression4.Parameters.Add(new CodePrimitiveExpression(attribute.NamespaceURI));
             string str3 = GetUniqueVariableName(name + "Attr", statements);
-            var statement3 = new CodeVariableDeclarationStatement(typeof (XmlAttribute), str3);
+            var statement3 = new CodeVariableDeclarationStatement(typeof(XmlAttribute), str3);
             statement3.InitExpression = expression4;
             statements.Add(statement3);
             var expression5 = new CodeVariableReferenceExpression(str3);
@@ -401,7 +398,7 @@ namespace WebServiceStudio
         private bool IsCLSCompliant(Type type)
         {
             var customAttributes =
-                type.GetCustomAttributes(typeof (CLSCompliantAttribute), true) as CLSCompliantAttribute[];
+                type.GetCustomAttributes(typeof(CLSCompliantAttribute), true) as CLSCompliantAttribute[];
             if (customAttributes.Length != 1)
             {
                 return false;
