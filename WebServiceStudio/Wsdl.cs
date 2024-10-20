@@ -20,13 +20,13 @@ namespace WebServiceStudio
 {
     internal class Wsdl
     {
-        private static string duplicateSchema =
+        private static readonly string duplicateSchema =
             "Warning: Ignoring duplicate schema description with TargetNamespace='{0}' from '{1}'.";
 
-        private static string duplicateService =
+        private static readonly string duplicateService =
             "Warning: Ignoring duplicate service description with TargetNamespace='{0}' from '{1}'.";
 
-        private static string schemaValidationFailure =
+        private static readonly string schemaValidationFailure =
             "Schema could not be validated. Class generation may fail or may produce incorrect results";
 
         private readonly StringCollection paths = new StringCollection();

@@ -107,7 +107,6 @@ namespace WebServiceStudio
             if (buttonGet.Text == "Get")
             {
                 ClearAllTabs();
-                TabPage selectedTab = tabMain.SelectedTab;
                 tabMain.SelectedTab = tabPageMessage;
                 string text = textEndPointUri.Text;
                 wsdl.Reset();
@@ -720,7 +719,6 @@ namespace WebServiceStudio
                 try
                 {
                     MethodInfo method = currentMethodProperty.GetMethod();
-                    Type declaringType = method.DeclaringType;
                     WSSWebRequest.RequestTrace = properties;
                     var parameters = currentMethodProperty.ReadChildren() as object[];
                     object result = method.Invoke(proxy, BindingFlags.Public, null, parameters, null);
