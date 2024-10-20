@@ -16,6 +16,7 @@ namespace WebServiceStudio
 {
     public class MainForm : Form
     {
+        private const string localHost = "https://localhost";
         private static bool isV1;
         private static MainForm mainForm;
 
@@ -977,12 +978,12 @@ namespace WebServiceStudio
         {
             Encoding encoding = new UTF8Encoding(true);
             var selectedObject = propRequest.SelectedObject as RequestProperties;
-            var request = (HttpWebRequest)WebRequest.CreateDefault(new Uri(selectedObject.Url));
-            if ((selectedObject.HttpProxy != null) && (selectedObject.HttpProxy.Length != 0))
+            var request = (HttpWebRequest)WebRequest.CreateDefault(new Uri(selectedObject != null ? selectedObject.Url : localHost));
+            if ((selectedObject != null) && (selectedObject.HttpProxy != null) && (selectedObject.HttpProxy.Length != 0))
             {
                 request.Proxy = new WebProxy(selectedObject.HttpProxy);
             }
-            request.Method = selectedObject.Method.ToString();
+            request.Method = selectedObject?.Method.ToString();
             request.ContentType = selectedObject.ContentType;
             request.Headers["SOAPAction"] = selectedObject.SOAPAction;
             request.SendChunked = selectedObject.SendChunked;
@@ -1195,6 +1196,8 @@ namespace WebServiceStudio
             property2.TreeNode = tag.TreeNode;
             property2.RecreateSubtree(null);
             treeInput.SelectedNode = property2.TreeNode;
+            textReader.Close();
+            textReader.Dispose();
         }
 
         private void treeMethods_AfterSelect(object sender, TreeViewEventArgs e)
