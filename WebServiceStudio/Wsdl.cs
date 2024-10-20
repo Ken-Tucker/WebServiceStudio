@@ -123,7 +123,7 @@ namespace WebServiceStudio
                     else
                     {
                         CheckPoint(MessageType.Warning,
-                            string.Format(duplicateSchema, serviceDescription.TargetNamespace, path));
+                            string.Format(duplicateSchema, schema.TargetNamespace, path));
                     }
                 }
             }

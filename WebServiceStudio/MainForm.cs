@@ -16,6 +16,7 @@ namespace WebServiceStudio
 {
     public class MainForm : Form
     {
+        private const string localHost = "https://localhost";
         private static bool isV1;
         private static MainForm mainForm;
 
@@ -173,8 +174,8 @@ namespace WebServiceStudio
             if (o != null)
             {
                 var writer = new StringWriter();
-                Type[] extraTypes = {o.GetType()};
-                Type type = (o is DataSet) ? typeof (DataSet) : typeof (object);
+                Type[] extraTypes = { o.GetType() };
+                Type type = (o is DataSet) ? typeof(DataSet) : typeof(object);
                 new XmlSerializer(type, extraTypes).Serialize(writer, o);
                 Clipboard.SetDataObject(writer.ToString());
             }
@@ -205,7 +206,7 @@ namespace WebServiceStudio
                     if (TreeNodeProperty.IsWebService(type))
                     {
                         TreeNode node = treeMethods.Nodes.Add(type.Name);
-                        var proxy = (HttpWebClientProtocol) Activator.CreateInstance(type);
+                        var proxy = (HttpWebClientProtocol)Activator.CreateInstance(type);
                         var property = new ProxyProperty(proxy);
                         property.RecreateSubtree(null);
                         node.Tag = property.TreeNode;
@@ -451,7 +452,7 @@ namespace WebServiceStudio
             }
             catch (Exception exception)
             {
-                Console.WriteLine(exception.ToString());
+                Console.WriteLine(exception.Message);
             }
             toolBarButton1.Text = "Open Wsdl...";
             toolBarButton1.ToolTipText = "Open WSDL file(s)";
@@ -567,17 +568,17 @@ namespace WebServiceStudio
             menuItemTreeInputPaste.ShortcutKeys = Keys.Control | Keys.V;
             menuItemTreeInputPaste.Text = "Paste";
             menuItemTreeInputPaste.Click += treeInputMenuPaste_Click;
-            tabPageWsdl.Controls.AddRange(new Control[] {splitterWsdl, panelRightWsdl, panelLeftWsdl});
+            tabPageWsdl.Controls.AddRange(new Control[] { splitterWsdl, panelRightWsdl, panelLeftWsdl });
             tabPageWsdl.Name = "tabPageWsdl";
             tabPageWsdl.Tag = "";
             tabPageWsdl.Text = "WSDLs & Proxy";
             panelLeftWsdl.BorderStyle = BorderStyle.None;
-            panelLeftWsdl.Controls.AddRange(new Control[] {treeWsdl});
+            panelLeftWsdl.Controls.AddRange(new Control[] { treeWsdl });
             panelLeftWsdl.Dock = DockStyle.Left;
             panelLeftWsdl.Name = "panelLeftWsdl";
             panelLeftWsdl.Size = new Size(0xd0, 0x1fd);
             panelRightWsdl.BorderStyle = BorderStyle.None;
-            panelRightWsdl.Controls.AddRange(new Control[] {richWsdl});
+            panelRightWsdl.Controls.AddRange(new Control[] { richWsdl });
             panelRightWsdl.Dock = DockStyle.Fill;
             panelRightWsdl.Name = "panelRightWsdl";
             panelRightWsdl.Location = new Point(0xd0, 0);
@@ -598,7 +599,7 @@ namespace WebServiceStudio
             richWsdl.Text = "";
             richWsdl.WordWrap = false;
             richWsdl.HideSelection = false;
-            tabPageMessage.Controls.AddRange(new Control[] {richMessage});
+            tabPageMessage.Controls.AddRange(new Control[] { richMessage });
             tabPageMessage.Name = "tabPageMessage";
             tabPageMessage.Tag = "";
             tabPageMessage.Text = "Messages";
@@ -607,7 +608,7 @@ namespace WebServiceStudio
             richMessage.Name = "richMessage";
             richMessage.ReadOnly = true;
             richMessage.Text = "";
-            tabMain.Controls.AddRange(new Control[] {tabPageInvoke, tabPageRaw, tabPageWsdl, tabPageMessage});
+            tabMain.Controls.AddRange(new Control[] { tabPageInvoke, tabPageRaw, tabPageWsdl, tabPageMessage });
             tabMain.Dock = DockStyle.Fill;
             tabMain.Font = new Font("Microsoft Sans Serif", 8.25f, FontStyle.Regular, GraphicsUnit.Point, 0);
             tabMain.ItemSize = new Size(0x2a, 0x12);
@@ -615,11 +616,11 @@ namespace WebServiceStudio
             tabMain.SelectedIndex = 0;
             tabMain.Appearance = TabAppearance.FlatButtons;
             tabMain.SelectedIndexChanged += tabMain_SelectedIndexChanged;
-            tabPageRaw.Controls.AddRange(new Control[] {splitterRaw, panelRightRaw, panelLeftRaw});
+            tabPageRaw.Controls.AddRange(new Control[] { splitterRaw, panelRightRaw, panelLeftRaw });
             tabPageRaw.Name = "tabPageRaw";
             tabPageRaw.Text = "Request/Response";
             panelLeftRaw.BorderStyle = BorderStyle.None;
-            panelLeftRaw.Controls.AddRange(new Control[] {propRequest});
+            panelLeftRaw.Controls.AddRange(new Control[] { propRequest });
             panelLeftRaw.Dock = DockStyle.Left;
             panelLeftRaw.Name = "panelLeftRaw";
             panelLeftRaw.Size = new Size(0xd0, 0x1fd);
@@ -682,15 +683,15 @@ namespace WebServiceStudio
             panelTopMain.Size = new Size(0, 50);
             panelTopMain.TabIndex = 0;
             panelBottomMain.BorderStyle = BorderStyle.None;
-            panelBottomMain.Controls.AddRange(new Control[] {tabMain});
+            panelBottomMain.Controls.AddRange(new Control[] { tabMain });
             panelBottomMain.Dock = DockStyle.Fill;
             panelBottomMain.Location = new Point(0, 50);
             panelBottomMain.Name = "panelBottomMain";
             panelBottomMain.TabIndex = 1;
             AutoScaleBaseSize = new Size(5, 13);
             base.ClientSize = new Size(0x2fe, 0x2bf);
-            base.Controls.AddRange(new Control[] {panelBottomMain, panelTopMain});
-            base.Icon = new Icon(typeof (MainForm), "WebServiceStudio.ico");
+            base.Controls.AddRange(new Control[] { panelBottomMain, panelTopMain });
+            base.Icon = new Icon(typeof(MainForm), "WebServiceStudio.ico");
             base.MainMenuStrip = mainMenu1;
             base.Name = "MainForm";
             Text = ".NET WebService Studio";
@@ -742,7 +743,7 @@ namespace WebServiceStudio
 
         private bool IsValidCopyNode(TreeNodeProperty tnp)
         {
-            return (((tnp != null) && (tnp.TreeNode.Parent != null)) && (tnp.GetType() != typeof (TreeNodeProperty)));
+            return (((tnp != null) && (tnp.TreeNode.Parent != null)) && (tnp.GetType() != typeof(TreeNodeProperty)));
         }
 
         private bool IsValidPasteNode(TreeNodeProperty tnp)
@@ -758,7 +759,7 @@ namespace WebServiceStudio
         [STAThread]
         private static void Main()
         {
-            Version version = typeof (string).Assembly.GetName().Version;
+            Version version = typeof(string).Assembly.GetName().Version;
             isV1 = ((version.Major == 1) && (version.Minor == 0)) && (version.Build == 0xce4);
             mainForm = new MainForm();
             WSSWebRequestCreate.RegisterPrefixes();
@@ -907,10 +908,10 @@ namespace WebServiceStudio
 
         private void PanelRightInvoke_SizeChanged(object sender, EventArgs e)
         {
-            int width = (panelRightInvoke.Width - 0x18)/2;
+            int width = (panelRightInvoke.Width - 0x18) / 2;
             int x = 8;
             int num3 = (8 + width) + 8;
-            int height = (((panelRightInvoke.Height - 0x10) - 20) - 40)/2;
+            int height = (((panelRightInvoke.Height - 0x10) - 20) - 40) / 2;
             int y = 8;
             int num6 = (0x1c + height) + 20;
             labelInput.SetBounds(x, y, 0, 0, BoundsSpecified.Location);
@@ -924,14 +925,14 @@ namespace WebServiceStudio
             propInput.SetBounds(num3, y, width, height, BoundsSpecified.All);
             propOutput.SetBounds(num3, num6, width, height, BoundsSpecified.All);
             buttonInvoke.SetBounds((num3 + width) - buttonInvoke.Width,
-                ((panelRightInvoke.Height + 20) - buttonInvoke.Height)/2, 0, 0, BoundsSpecified.Location);
+                ((panelRightInvoke.Height + 20) - buttonInvoke.Height) / 2, 0, 0, BoundsSpecified.Location);
         }
 
         private void PanelRightRaw_SizeChanged(object sender, EventArgs e)
         {
             int width = panelRightRaw.Width - 0x10;
             int x = 8;
-            int height = (((panelRightRaw.Height - 0x10) - 20) - 40)/2;
+            int height = (((panelRightRaw.Height - 0x10) - 20) - 40) / 2;
             int y = 8;
             int num5 = (0x1c + height) + 20;
             labelRequest.SetBounds(x, y, 0, 0, BoundsSpecified.Location);
@@ -940,7 +941,7 @@ namespace WebServiceStudio
             num5 += 20;
             richRequest.SetBounds(x, y, width, height, BoundsSpecified.All);
             richResponse.SetBounds(x, num5, width, height, BoundsSpecified.All);
-            buttonSend.SetBounds((x + width) - buttonSend.Width, ((panelRightRaw.Height + 20) - buttonSend.Height)/2, 0,
+            buttonSend.SetBounds((x + width) - buttonSend.Width, ((panelRightRaw.Height + 20) - buttonSend.Height) / 2, 0,
                 0, BoundsSpecified.Location);
         }
 
@@ -977,12 +978,12 @@ namespace WebServiceStudio
         {
             Encoding encoding = new UTF8Encoding(true);
             var selectedObject = propRequest.SelectedObject as RequestProperties;
-            var request = (HttpWebRequest) WebRequest.CreateDefault(new Uri(selectedObject.Url));
-            if ((selectedObject.HttpProxy != null) && (selectedObject.HttpProxy.Length != 0))
+            var request = (HttpWebRequest)WebRequest.CreateDefault(new Uri(selectedObject != null ? selectedObject.Url : localHost));
+            if ((selectedObject != null) && (selectedObject.HttpProxy != null) && (selectedObject.HttpProxy.Length != 0))
             {
                 request.Proxy = new WebProxy(selectedObject.HttpProxy);
             }
-            request.Method = selectedObject.Method.ToString();
+            request.Method = selectedObject?.Method.ToString();
             request.ContentType = selectedObject.ContentType;
             request.Headers["SOAPAction"] = selectedObject.SOAPAction;
             request.SendChunked = selectedObject.SendChunked;
@@ -1014,7 +1015,7 @@ namespace WebServiceStudio
             }
             if (selectedObject.UseDefaultCredential)
             {
-                cache.Add(new Uri(selectedObject.Url), "NTLM", (NetworkCredential) CredentialCache.DefaultCredentials);
+                cache.Add(new Uri(selectedObject.Url), "NTLM", (NetworkCredential)CredentialCache.DefaultCredentials);
                 flag = true;
             }
             if (flag)
@@ -1030,7 +1031,7 @@ namespace WebServiceStudio
             }
             try
             {
-                var response = (HttpWebResponse) request.GetResponse();
+                var response = (HttpWebResponse)request.GetResponse();
                 DumpResponse(response);
                 response.Close();
             }
@@ -1038,7 +1039,7 @@ namespace WebServiceStudio
             {
                 if (exception.Response != null)
                 {
-                    DumpResponse((HttpWebResponse) exception.Response);
+                    DumpResponse((HttpWebResponse)exception.Response);
                 }
                 else
                 {
@@ -1085,7 +1086,7 @@ namespace WebServiceStudio
                     richMessage.Update();
                     if (sender == wsdl)
                     {
-                        base.BeginInvoke(new WsdlGenerationDoneCallback(WsdlGenerationDone), new object[] {true});
+                        base.BeginInvoke(new WsdlGenerationDoneCallback(WsdlGenerationDone), new object[] { true });
                     }
                     break;
 
@@ -1095,7 +1096,7 @@ namespace WebServiceStudio
                     richMessage.Update();
                     if (sender == wsdl)
                     {
-                        base.BeginInvoke(new WsdlGenerationDoneCallback(WsdlGenerationDone), new object[] {false});
+                        base.BeginInvoke(new WsdlGenerationDoneCallback(WsdlGenerationDone), new object[] { false });
                     }
                     break;
 
@@ -1152,7 +1153,7 @@ namespace WebServiceStudio
                 {
                     for (int i = 0; i < textEndPointUri.Items.Count; i++)
                     {
-                        if (((string) textEndPointUri.Items[i]).StartsWith(text))
+                        if (((string)textEndPointUri.Items[i]).StartsWith(text))
                         {
                             textEndPointUri.SelectedIndex = i;
                             textEndPointUri.Select(text.Length, textEndPointUri.Text.Length);
@@ -1183,18 +1184,21 @@ namespace WebServiceStudio
                 throw new Exception("Paste not valid on method");
             }
             Type[] typeList = tag.GetTypeList();
-            Type type = typeof (DataSet).IsAssignableFrom(typeList[0]) ? typeof (DataSet) : typeof (object);
+            Type type = typeof(DataSet).IsAssignableFrom(typeList[0]) ? typeof(DataSet) : typeof(object);
             var serializer = new XmlSerializer(type, typeList);
-            var textReader = new StringReader((string) Clipboard.GetDataObject().GetData(DataFormats.Text));
-            object val = serializer.Deserialize(textReader);
-            if ((val == null) || !typeList[0].IsAssignableFrom(val.GetType()))
+            using (var textReader = new StringReader((string)Clipboard.GetDataObject().GetData(DataFormats.Text)))
             {
-                throw new Exception("Invalid Type pasted");
+                object val = serializer.Deserialize(textReader);
+                if ((val == null) || !typeList[0].IsInstanceOfType(val))
+                {
+                    throw new Exception("Invalid Type pasted");
+                }
+                TreeNodeProperty property2 = TreeNodeProperty.CreateTreeNodeProperty(tag, val);
+                property2.TreeNode = tag.TreeNode;
+                property2.RecreateSubtree(null);
+                treeInput.SelectedNode = property2.TreeNode;
+                textReader.Close();
             }
-            TreeNodeProperty property2 = TreeNodeProperty.CreateTreeNodeProperty(tag, val);
-            property2.TreeNode = tag.TreeNode;
-            property2.RecreateSubtree(null);
-            treeInput.SelectedNode = property2.TreeNode;
         }
 
         private void treeMethods_AfterSelect(object sender, TreeViewEventArgs e)
@@ -1211,7 +1215,7 @@ namespace WebServiceStudio
             else if (e.Node.Tag is TreeNode)
             {
                 treeInput.Nodes.Clear();
-                treeInput.Nodes.Add((TreeNode) e.Node.Tag);
+                treeInput.Nodes.Add((TreeNode)e.Node.Tag);
             }
             treeInput.ExpandAll();
             treeInput.SelectedNode = treeInput.Nodes[0];
