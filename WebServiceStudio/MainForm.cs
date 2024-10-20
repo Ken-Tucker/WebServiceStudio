@@ -1186,18 +1186,19 @@ namespace WebServiceStudio
             Type[] typeList = tag.GetTypeList();
             Type type = typeof(DataSet).IsAssignableFrom(typeList[0]) ? typeof(DataSet) : typeof(object);
             var serializer = new XmlSerializer(type, typeList);
-            var textReader = new StringReader((string)Clipboard.GetDataObject().GetData(DataFormats.Text));
-            object val = serializer.Deserialize(textReader);
-            if ((val == null) || !typeList[0].IsAssignableFrom(val.GetType()))
+            using (var textReader = new StringReader((string)Clipboard.GetDataObject().GetData(DataFormats.Text)))
             {
-                throw new Exception("Invalid Type pasted");
+                object val = serializer.Deserialize(textReader);
+                if ((val == null) || !typeList[0].IsInstanceOfType(val))
+                {
+                    throw new Exception("Invalid Type pasted");
+                }
+                TreeNodeProperty property2 = TreeNodeProperty.CreateTreeNodeProperty(tag, val);
+                property2.TreeNode = tag.TreeNode;
+                property2.RecreateSubtree(null);
+                treeInput.SelectedNode = property2.TreeNode;
+                textReader.Close();
             }
-            TreeNodeProperty property2 = TreeNodeProperty.CreateTreeNodeProperty(tag, val);
-            property2.TreeNode = tag.TreeNode;
-            property2.RecreateSubtree(null);
-            treeInput.SelectedNode = property2.TreeNode;
-            textReader.Close();
-            textReader.Dispose();
         }
 
         private void treeMethods_AfterSelect(object sender, TreeViewEventArgs e)
