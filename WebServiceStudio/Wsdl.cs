@@ -33,7 +33,7 @@ namespace WebServiceStudio
         private readonly StringCollection wsdls = new StringCollection();
         private readonly StringCollection xsds = new StringCollection();
         private bool cancelled;
-        private CodeDomProvider codeProvider;29
+        private CodeDomProvider codeProvider;
         private CodeCompileUnit compileUnit;
         private Assembly proxyAssembly;
         private string proxyCode = "<NOT YET>";
