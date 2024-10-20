@@ -585,7 +585,6 @@ namespace WebServiceStudio
                 importer.AddServiceDescription(description, "", "");
             }
             importer.Style = ServiceDescriptionImportStyle.Client;
-            Protocol protocol = WsdlProperties.Protocol;
             importer.ProtocolName = WsdlProperties.Protocol.ToString();
             var namespace2 = new CodeNamespace(proxyNamespace);
             compileUnit.Namespaces.Add(namespace2);
@@ -606,10 +605,8 @@ namespace WebServiceStudio
                     compileUnit.ReferencedAssemblies.Add("System.Data.dll");
                     foreach (XmlSchema schema in schemas)
                     {
-                        string targetNamespace = null;
                         try
                         {
-                            targetNamespace = schema.TargetNamespace;
                             if (XmlSchemas.IsDataSet(schema))
                             {
                                 if (stream == null)
