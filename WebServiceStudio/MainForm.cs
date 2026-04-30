@@ -729,6 +729,10 @@ namespace WebServiceStudio
                     treeOutput.Nodes.Add(property2.TreeNode);
                     treeOutput.ExpandAll();
                 }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.InnerException?.Message ?? ex.Message, ex.Message);
+                }
                 finally
                 {
                     WSSWebRequest.RequestTrace = null;
