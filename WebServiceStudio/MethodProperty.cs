@@ -43,10 +43,16 @@ namespace WebServiceStudio
             ParameterInfo[] parameters = method.GetParameters();
             for (int i = 0; i < parameters.Length; i++)
             {
-                if ((!isIn && (parameters[i].IsOut || parameters[i].ParameterType.IsByRef)) ||
-                    (isIn && !parameters[i].IsOut))
+                ParameterInfo parameter = parameters[i];
+                bool isOutParameter = parameter.IsOut;
+                bool isByRefParameter = parameter.ParameterType.IsByRef;
+                bool includeForOutput = !isIn && (isOutParameter || isByRefParameter);
+                bool includeForInput = isIn && !isOutParameter;
+                bool shouldInclude = includeForOutput || includeForInput;
+
+                if (shouldInclude)
                 {
-                    Type parameterType = parameters[i].ParameterType;
+                    Type parameterType = parameter.ParameterType;
                     if (parameterType.IsByRef)
                     {
                         parameterType = parameterType.GetElementType();
@@ -54,7 +60,7 @@ namespace WebServiceStudio
                     object val = (paramValues != null)
                         ? paramValues[i]
                         : (isIn ? CreateNewInstance(parameterType) : null);
-                    CreateTreeNodeProperty(base.GetIncludedTypes(parameterType), parameters[i].Name, val)
+                    CreateTreeNodeProperty(base.GetIncludedTypes(parameterType), parameter.Name, val)
                         .RecreateSubtree(parentNode);
                 }
             }
