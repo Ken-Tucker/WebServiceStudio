@@ -49,6 +49,7 @@ namespace WebServiceStudio
                 InitializeComponent();
             }
 
+            [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
             internal DataSet DataSource
             {
                 get { return (dataGrid1.DataSource as DataSet); }

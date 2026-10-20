@@ -39,9 +39,6 @@ namespace WebServiceStudio
         }
 
         [Browsable(false)]
-        public CustomHandler[] ProxyProperties { get; set; }
-
-        [Browsable(false)]
         public CustomHandler[] TypeConverters { get; set; }
 
         public UiProperties UiSettings { get; set; }
@@ -60,18 +57,6 @@ namespace WebServiceStudio
         private static string GetConfigFileName()
         {
             return (Assembly.GetExecutingAssembly().Location + ".options");
-        }
-
-        internal string[] GetProxyBaseTypes()
-        {
-            CustomHandler[] proxyProperties = ProxyProperties;
-            var strArray = new string[(proxyProperties != null) ? (proxyProperties.Length + 1) : 1];
-            strArray[0] = "";
-            for (int i = 1; i < strArray.Length; i++)
-            {
-                strArray[i] = proxyProperties[i - 1].TypeName;
-            }
-            return strArray;
         }
 
         public static void LoadMasterConfig()

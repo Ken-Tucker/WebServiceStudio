@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
-using System.Reflection;
-using System.Web.Services.Protocols;
 using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Serialization;
@@ -12,8 +10,6 @@ namespace WebServiceStudio
 {
     internal class TreeNodeProperty
     {
-        private static readonly Hashtable includedTypesLookup = new Hashtable();
-
         private static readonly Type[] systemTypes =
         {
             typeof (bool), typeof (byte), typeof (byte[]), typeof (sbyte), typeof (short), typeof (int), typeof (long),
@@ -47,23 +43,6 @@ namespace WebServiceStudio
             Array.Copy(types, destinationArray, types.Length);
             destinationArray[types.Length] = type;
             types = destinationArray;
-        }
-
-        private void AddTypeToList(Type[] includedTypes, ArrayList list)
-        {
-            var type = list[0] as Type;
-            foreach (Type type2 in includedTypes)
-            {
-                if (type.IsAssignableFrom(type2) && !list.Contains(type2))
-                {
-                    list.Add(type2);
-                }
-            }
-        }
-
-        public static void ClearIncludedTypes()
-        {
-            includedTypesLookup.Clear();
         }
 
         protected virtual void CreateChildren()
@@ -163,69 +142,17 @@ namespace WebServiceStudio
             return new ClassProperty(possibleTypes, name, val);
         }
 
-        private static Type[] GetAllIncludedTypes(Type webService)
-        {
-            var typeArray = includedTypesLookup[webService] as Type[];
-            if (typeArray == null)
-            {
-                var list = new ArrayList();
-                var customAttributes =
-                    webService.GetCustomAttributes(typeof (SoapIncludeAttribute), true) as SoapIncludeAttribute[];
-                foreach (SoapIncludeAttribute attribute in customAttributes)
-                {
-                    list.Add(attribute.Type);
-                }
-                var attributeArray2 =
-                    webService.GetCustomAttributes(typeof (XmlIncludeAttribute), true) as XmlIncludeAttribute[];
-                foreach (XmlIncludeAttribute attribute2 in attributeArray2)
-                {
-                    list.Add(attribute2.Type);
-                }
-                foreach (Type type in systemTypes)
-                {
-                    list.Add(type);
-                }
-                typeArray = (Type[]) list.ToArray(typeof (Type));
-                includedTypesLookup[webService] = typeArray;
-            }
-            return typeArray;
-        }
-
-        protected virtual MethodInfo GetCurrentMethod()
-        {
-            TreeNodeProperty parent = GetParent();
-            if (parent == null)
-            {
-                return null;
-            }
-            return parent.GetCurrentMethod();
-        }
-
-        protected virtual object GetCurrentProxy()
-        {
-            TreeNodeProperty parent = GetParent();
-            if (parent == null)
-            {
-                return null;
-            }
-            return parent.GetCurrentProxy();
-        }
-
         protected Type[] GetIncludedTypes(Type type)
         {
-            var list = new ArrayList();
-            list.Add(type);
-            if (type.IsByRef)
+            var includedTypes = new List<Type> { type };
+            foreach (Type systemType in systemTypes)
             {
-                type = type.GetElementType();
+                if (type.IsAssignableFrom(systemType) && !includedTypes.Contains(systemType))
+                {
+                    includedTypes.Add(systemType);
+                }
             }
-            MethodInfo currentMethod = GetCurrentMethod();
-            if (currentMethod != null)
-            {
-                AddTypeToList(GetAllIncludedTypes(currentMethod.DeclaringType), list);
-            }
-            AddTypeToList(GetAllIncludedTypes(type), list);
-            return (Type[]) list.ToArray(typeof (Type));
+            return includedTypes.ToArray();
         }
 
         public TreeNodeProperty GetParent()
@@ -293,27 +220,6 @@ namespace WebServiceStudio
         {
             return (((type.IsEnum || type.IsPrimitive) || ((type == typeof (DateTime)) || (type == typeof (TimeSpan)))) ||
                     (type == typeof (decimal)));
-        }
-
-        public static bool IsWebMethod(MethodInfo method)
-        {
-            object[] customAttributes = method.GetCustomAttributes(typeof (SoapRpcMethodAttribute), true);
-            if ((customAttributes != null) && (customAttributes.Length > 0))
-            {
-                return true;
-            }
-            customAttributes = method.GetCustomAttributes(typeof (SoapDocumentMethodAttribute), true);
-            if ((customAttributes != null) && (customAttributes.Length > 0))
-            {
-                return true;
-            }
-            customAttributes = method.GetCustomAttributes(typeof (HttpMethodAttribute), true);
-            return ((customAttributes != null) && (customAttributes.Length > 0));
-        }
-
-        public static bool IsWebService(Type type)
-        {
-            return typeof (HttpWebClientProtocol).IsAssignableFrom(type);
         }
 
         public virtual object ReadChildren()
