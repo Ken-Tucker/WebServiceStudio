@@ -236,28 +236,20 @@ namespace WebServiceStudio
                 {
                     continue;
                 }
-                XNamespace targetNamespace = (string)definitions.Attribute("targetNamespace") ?? "";
-                var bindings = definitions.Elements(WsdlNamespace + "binding")
-                    .ToDictionary(binding => (string)binding.Attribute("name"), StringComparer.Ordinal);
-                var portTypes = definitions.Elements(WsdlNamespace + "portType")
-                    .ToDictionary(portType => (string)portType.Attribute("name"), StringComparer.Ordinal);
-                var messages = definitions.Elements(WsdlNamespace + "message")
-                    .ToDictionary(message => (string)message.Attribute("name"), StringComparer.Ordinal);
-
                 foreach (XElement service in definitions.Elements(WsdlNamespace + "service"))
                 {
                     foreach (XElement port in service.Elements(WsdlNamespace + "port"))
                     {
                         string endpoint = (string)port.Elements().FirstOrDefault(element =>
                             element.Name.LocalName == "address")?.Attribute("location");
-                        XElement bindingElement = ResolveNamedElement(port, (string)port.Attribute("binding"),
-                            bindings, targetNamespace);
+                        XElement bindingElement = ResolveWsdlElement(port, (string)port.Attribute("binding"),
+                            documents, "binding");
                         if (bindingElement == null || string.IsNullOrEmpty(endpoint))
                         {
                             continue;
                         }
-                        XElement bindingTypeElement = ResolveNamedElement(bindingElement,
-                            (string)bindingElement.Attribute("type"), portTypes, targetNamespace);
+                        XElement bindingTypeElement = ResolveWsdlElement(bindingElement,
+                            (string)bindingElement.Attribute("type"), documents, "portType");
                         if (bindingTypeElement == null)
                         {
                             continue;
@@ -279,8 +271,8 @@ namespace WebServiceStudio
                                 .FirstOrDefault(element => (string)element.Attribute("name") == operationName);
                             string inputMessage = (string)portOperation?.Element(WsdlNamespace + "input")?
                                 .Attribute("message");
-                            XElement message = ResolveNamedElement(portOperation ?? bindingOperation, inputMessage,
-                                messages, targetNamespace);
+                            XElement message = ResolveWsdlElement(portOperation ?? bindingOperation, inputMessage,
+                                documents, "message");
                             if (message == null)
                             {
                                 continue;
@@ -316,8 +308,8 @@ namespace WebServiceStudio
             }
         }
 
-        private static XElement ResolveNamedElement(XElement context, string qualifiedName,
-            IDictionary<string, XElement> candidates, XNamespace targetNamespace)
+        private static XElement ResolveWsdlElement(XElement context, string qualifiedName,
+            IList<MetadataDocument> documents, string elementName)
         {
             if (string.IsNullOrEmpty(qualifiedName))
             {
@@ -325,10 +317,20 @@ namespace WebServiceStudio
             }
             int separator = qualifiedName.IndexOf(':');
             string name = separator < 0 ? qualifiedName : qualifiedName.Substring(separator + 1);
+            XElement definitions = context.AncestorsAndSelf()
+                .FirstOrDefault(element => element.Name == WsdlNamespace + "definitions");
+            XNamespace targetNamespace = (string)definitions?.Attribute("targetNamespace") ?? "";
             XNamespace ns = separator < 0
                 ? targetNamespace
                 : context.GetNamespaceOfPrefix(qualifiedName.Substring(0, separator));
-            return ns == targetNamespace && candidates.TryGetValue(name, out XElement element) ? element : null;
+            if (ns == null)
+            {
+                return null;
+            }
+            return documents.SelectMany(document => document.Xml.Root?.Elements(WsdlNamespace + elementName) ??
+                                                  Enumerable.Empty<XElement>())
+                .FirstOrDefault(element => (string)element.Attribute("name") == name &&
+                                           (string)element.Parent?.Attribute("targetNamespace") == ns.NamespaceName);
         }
 
         private static XElement CreatePartElement(XElement part, IList<MetadataDocument> documents)
