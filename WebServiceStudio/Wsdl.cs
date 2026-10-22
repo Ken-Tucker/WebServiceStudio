@@ -546,7 +546,6 @@ namespace WebServiceStudio
 
         private void GenerateAssembly()
         {
-            ICodeCompiler compiler = codeProvider.CreateCompiler();
             string location = "";
             if ((WsdlProperties.ProxyBaseType != null) && (WsdlProperties.ProxyBaseType.Length > 0))
             {
@@ -560,7 +559,7 @@ namespace WebServiceStudio
             var options = new CompilerParameters(assemblyNames);
             options.WarningLevel = 0;
             options.GenerateInMemory = false;
-            CompilerResults results = compiler.CompileAssemblyFromSource(options, proxyCode);
+            CompilerResults results = codeProvider.CompileAssemblyFromSource(options, proxyCode);
             if (results.Errors.HasErrors)
             {
                 foreach (CompilerError error in results.Errors)
