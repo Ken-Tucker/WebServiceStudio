@@ -1,14 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Reflection;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
-using System.Web.Services.Protocols;
 using System.Windows.Forms;
 using System.Xml.Serialization;
 
@@ -85,6 +85,7 @@ namespace WebServiceStudio
         private TreeView treeOutput;
         private TreeView treeWsdl;
         private Wsdl wsdl;
+        private IList<SoapParameter> requestParameters = new List<SoapParameter>();
 
         public MainForm()
         {
@@ -103,7 +104,6 @@ namespace WebServiceStudio
 
         private void buttonGet_Click(object sender, EventArgs e)
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11;
             if (buttonGet.Text == "Get")
             {
                 ClearAllTabs();
@@ -129,8 +129,6 @@ namespace WebServiceStudio
             Cursor = Cursors.WaitCursor;
             try
             {
-                propOutput.SelectedObject = null;
-                treeOutput.Nodes.Clear();
                 InvokeWebMethod();
             }
             finally
@@ -156,7 +154,6 @@ namespace WebServiceStudio
             richResponse.Clear();
             richResponse.Font = Configuration.MasterConfig.UiSettings.ReqRespFont;
             treeMethods.Nodes.Clear();
-            TreeNodeProperty.ClearIncludedTypes();
             treeInput.Nodes.Clear();
             treeOutput.Nodes.Clear();
             propInput.SelectedObject = null;
@@ -189,45 +186,14 @@ namespace WebServiceStudio
             base.Dispose(disposing);
         }
 
-        private void DumpResponse(HttpWebResponse response)
-        {
-            richResponse.Text = WSSWebResponse.DumpResponse(response);
-        }
-
         private void FillInvokeTab()
         {
-            Assembly proxyAssembly = wsdl.ProxyAssembly;
-            if (proxyAssembly != null)
+            treeMethods.Nodes.Clear();
+            foreach (ServiceOperation operation in wsdl.Operations)
             {
-                treeMethods.Nodes.Clear();
-                foreach (Type type in proxyAssembly.GetTypes())
-                {
-                    if (TreeNodeProperty.IsWebService(type))
-                    {
-                        TreeNode node = treeMethods.Nodes.Add(type.Name);
-                        var proxy = (HttpWebClientProtocol)Activator.CreateInstance(type);
-                        var property = new ProxyProperty(proxy);
-                        property.RecreateSubtree(null);
-                        node.Tag = property.TreeNode;
-                        proxy.Credentials = CredentialCache.DefaultCredentials;
-                        var protocol2 = proxy as SoapHttpClientProtocol;
-                        if (protocol2 != null)
-                        {
-                            protocol2.CookieContainer = new CookieContainer();
-                            protocol2.AllowAutoRedirect = true;
-                        }
-
-                        foreach (MethodInfo info in type.GetMethods().OrderBy(x => x.Name).ToList())
-                        {
-                            if (TreeNodeProperty.IsWebMethod(info))
-                            {
-                                node.Nodes.Add(info.Name).Tag = info;
-                            }
-                        }
-                    }
-                }
-                treeMethods.ExpandAll();
+                treeMethods.Nodes.Add(operation.ToString()).Tag = operation;
             }
+            treeMethods.ExpandAll();
         }
 
         private void FillWsdlTab()
@@ -254,8 +220,6 @@ namespace WebServiceStudio
                     node4.Tag = wsdl.Xsds[j];
                     writer.FillTree(wsdl.Xsds[j], node4);
                 }
-                treeWsdl.Nodes.Add("Proxy").Tag = wsdl.ProxyCode;
-                treeWsdl.Nodes.Add("ClientCode").Tag = "Shows client code for all methods accessed in the invoke tab";
                 node.Expand();
             }
         }
@@ -264,61 +228,6 @@ namespace WebServiceStudio
         {
             tabMain.SelectedTab = tabPageWsdl;
             richWsdl.Find(searchStr, richWsdl.SelectionStart + richWsdl.SelectionLength, findOption);
-        }
-
-        private string GenerateClientCode()
-        {
-            var script = new Script(wsdl.ProxyNamespace, "MainClass");
-            foreach (TreeNode node in treeMethods.Nodes)
-            {
-                script.Proxy = GetProxyPropertyFromNode(node).GetProxy();
-                foreach (TreeNode node2 in node.Nodes)
-                {
-                    var tag = node2.Tag as TreeNode;
-                    if (tag != null)
-                    {
-                        var property = tag.Tag as MethodProperty;
-                        if (property != null)
-                        {
-                            MethodInfo method = property.GetMethod();
-                            var parameters = property.ReadChildren() as object[];
-                            script.AddMethod(method, parameters);
-                        }
-                    }
-                }
-            }
-            return script.Generate(wsdl.GetCodeGenerator());
-        }
-
-        private MethodProperty GetCurrentMethodProperty()
-        {
-            if ((treeInput.Nodes == null) || (treeInput.Nodes.Count == 0))
-            {
-                MessageBox.Show(this, "Select a web method to execute");
-                return null;
-            }
-            TreeNode node = treeInput.Nodes[0];
-            var tag = node.Tag as MethodProperty;
-            if (tag == null)
-            {
-                MessageBox.Show(this, "Select a method to execute");
-                return null;
-            }
-            return tag;
-        }
-
-        private ProxyProperty GetProxyPropertyFromNode(TreeNode treeNode)
-        {
-            while (treeNode.Parent != null)
-            {
-                treeNode = treeNode.Parent;
-            }
-            var tag = treeNode.Tag as TreeNode;
-            if (tag != null)
-            {
-                return (tag.Tag as ProxyProperty);
-            }
-            return null;
         }
 
         private void InitializeComponent()
@@ -510,7 +419,6 @@ namespace WebServiceStudio
             propInput.ToolbarVisible = false;
             propInput.ViewBackColor = SystemColors.Window;
             propInput.ViewForeColor = SystemColors.WindowText;
-            propInput.PropertyValueChanged += propInput_PropertyValueChanged;
             treeMethods.HideSelection = false;
             treeMethods.ImageIndex = -1;
             treeMethods.Dock = DockStyle.Fill;
@@ -710,36 +618,38 @@ namespace WebServiceStudio
 
         private void InvokeWebMethod()
         {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
-            MethodProperty currentMethodProperty = GetCurrentMethodProperty();
-            if (currentMethodProperty != null)
+            ServiceOperation operation = treeMethods.SelectedNode?.Tag as ServiceOperation;
+            if (operation == null)
             {
-                HttpWebClientProtocol proxy = currentMethodProperty.GetProxyProperty().GetProxy();
-                var properties = new RequestProperties(proxy);
+                MessageBox.Show(this, "Select a SOAP operation to invoke");
+                return;
+            }
+            var properties = propRequest.SelectedObject as RequestProperties ?? new RequestProperties();
+            properties.Method = RequestProperties.HttpMethod.POST;
+            properties.Url = operation.Endpoint;
+            properties.SOAPAction = operation.Action;
+            properties.ContentType = operation.Soap12
+                ? "application/soap+xml; charset=utf-8" +
+                  (string.IsNullOrEmpty(operation.Action) ? "" : "; action=\"" + operation.Action + "\"")
+                : "text/xml; charset=utf-8";
+            richRequest.Text = operation.CreateEnvelope(requestParameters);
+            properties.requestPayLoad = richRequest.Text;
+            propRequest.SelectedObject = properties;
+            richResponse.Clear();
+            SendWebRequest();
+            treeOutput.Nodes.Clear();
+            TreeNode response = treeOutput.Nodes.Add(operation.Name + " response");
+            if (!string.IsNullOrWhiteSpace(richResponse.Text))
+            {
                 try
                 {
-                    MethodInfo method = currentMethodProperty.GetMethod();
-                    WSSWebRequest.RequestTrace = properties;
-                    var parameters = currentMethodProperty.ReadChildren() as object[];
-                    object result = method.Invoke(proxy, BindingFlags.Public, null, parameters, null);
-                    treeOutput.Nodes.Clear();
-                    var property2 = new MethodProperty(currentMethodProperty.GetProxyProperty(), method, result,
-                        parameters);
-                    property2.RecreateSubtree(null);
-                    treeOutput.Nodes.Add(property2.TreeNode);
-                    treeOutput.ExpandAll();
+                    new XmlTreeWriter().FillTree(richResponse.Text, response);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    MessageBox.Show(ex.InnerException?.Message ?? ex.Message, ex.Message);
+                    response.Nodes.Add(richResponse.Text);
                 }
-                finally
-                {
-                    WSSWebRequest.RequestTrace = null;
-                    propRequest.SelectedObject = properties;
-                    richRequest.Text = properties.requestPayLoad;
-                    richResponse.Text = properties.responsePayLoad;
-                }
+                treeOutput.ExpandAll();
             }
         }
 
@@ -764,15 +674,6 @@ namespace WebServiceStudio
             Version version = typeof(string).Assembly.GetName().Version;
             isV1 = ((version.Major == 1) && (version.Minor == 0)) && (version.Build == 0xce4);
             mainForm = new MainForm();
-            WSSWebRequestCreate.RegisterPrefixes();
-            try
-            {
-                mainForm.SetupAssemblyResolver();
-            }
-            catch (Exception exception)
-            {
-                MessageBox.Show(null, exception.ToString(), "Error Setting up Assembly Resolver");
-            }
             Application.Run(mainForm);
         }
 
@@ -859,8 +760,8 @@ namespace WebServiceStudio
         private void menuItemSaveAll_Click(object sender, EventArgs e)
         {
             if ((saveAllDialog.ShowDialog() == DialogResult.OK) &&
-                ((((wsdl.Wsdls != null) && (wsdl.Wsdls.Count != 0)) || ((wsdl.Xsds != null) && (wsdl.Xsds.Count != 0))) ||
-                 (wsdl.ProxyCode != null)))
+            (((wsdl.Wsdls != null) && (wsdl.Wsdls.Count != 0)) ||
+             ((wsdl.Xsds != null) && (wsdl.Xsds.Count != 0))))
             {
                 int length = saveAllDialog.FileName.LastIndexOf('.');
                 string str = (length >= 0) ? saveAllDialog.FileName.Substring(0, length) : saveAllDialog.FileName;
@@ -886,21 +787,7 @@ namespace WebServiceStudio
                         SaveFile(str + j + ".xsd", wsdl.Xsds[j]);
                     }
                 }
-                SaveFile(str + "." + wsdl.ProxyFileExtension, wsdl.ProxyCode);
-                SaveFile(str + "Client." + wsdl.ProxyFileExtension,
-                    Script.GetUsingCode(wsdl.WsdlProperties.Language) + "\n" + GenerateClientCode() + "\n" +
-                    Script.GetDumpCode(wsdl.WsdlProperties.Language));
             }
-        }
-
-        public Assembly OnAssemblyResolve(object sender, ResolveEventArgs args)
-        {
-            Assembly proxyAssembly = wsdl.ProxyAssembly;
-            if ((proxyAssembly != null) && (proxyAssembly.GetName().ToString() == args.Name))
-            {
-                return proxyAssembly;
-            }
-            return null;
         }
 
         private void PanelLeftRaw_SizeChanged(object sender, EventArgs e)
@@ -947,18 +834,6 @@ namespace WebServiceStudio
                 0, BoundsSpecified.Location);
         }
 
-        private void propInput_PropertyValueChanged(object s, PropertyValueChangedEventArgs e)
-        {
-            var selectedObject = propInput.SelectedObject as TreeNodeProperty;
-            if ((selectedObject != null) && ((e.ChangedItem.Label == "Type") && (e.OldValue != selectedObject.Type)))
-            {
-                TreeNodeProperty property2 = TreeNodeProperty.CreateTreeNodeProperty(selectedObject);
-                property2.TreeNode = selectedObject.TreeNode;
-                property2.RecreateSubtree(null);
-                treeInput.SelectedNode = property2.TreeNode;
-            }
-        }
-
         private bool SaveFile(string fileName, string contents)
         {
             if (File.Exists(fileName) &&
@@ -978,86 +853,62 @@ namespace WebServiceStudio
 
         private void SendWebRequest()
         {
-            Encoding encoding = new UTF8Encoding(true);
-            var selectedObject = propRequest.SelectedObject as RequestProperties;
-            var request = (HttpWebRequest)WebRequest.CreateDefault(new Uri(selectedObject != null ? selectedObject.Url : localHost));
-            if ((selectedObject != null) && (selectedObject.HttpProxy != null) && (selectedObject.HttpProxy.Length != 0))
-            {
-                request.Proxy = new WebProxy(selectedObject.HttpProxy);
-            }
-            request.Method = selectedObject?.Method.ToString();
-            request.ContentType = selectedObject.ContentType;
-            request.Headers["SOAPAction"] = selectedObject.SOAPAction;
-            request.SendChunked = selectedObject.SendChunked;
-            request.AllowAutoRedirect = selectedObject.AllowAutoRedirect;
-            request.AllowWriteStreamBuffering = selectedObject.AllowWriteStreamBuffering;
-            request.KeepAlive = selectedObject.KeepAlive;
-            request.Pipelined = selectedObject.Pipelined;
-            request.PreAuthenticate = selectedObject.PreAuthenticate;
-            request.Timeout = selectedObject.Timeout;
-            HttpWebClientProtocol proxy = GetCurrentMethodProperty().GetProxyProperty().GetProxy();
-            if (selectedObject.UseCookieContainer)
-            {
-                if (proxy.CookieContainer != null)
-                {
-                    request.CookieContainer = proxy.CookieContainer;
-                }
-                else
-                {
-                    request.CookieContainer = new CookieContainer();
-                }
-            }
-            var cache = new CredentialCache();
-            bool flag = false;
-            if ((selectedObject.BasicAuthUserName != null) && (selectedObject.BasicAuthUserName.Length != 0))
-            {
-                cache.Add(new Uri(selectedObject.Url), "Basic",
-                    new NetworkCredential(selectedObject.BasicAuthUserName, selectedObject.BasicAuthPassword));
-                flag = true;
-            }
-            if (selectedObject.UseDefaultCredential)
-            {
-                cache.Add(new Uri(selectedObject.Url), "NTLM", (NetworkCredential)CredentialCache.DefaultCredentials);
-                flag = true;
-            }
-            if (flag)
-            {
-                request.Credentials = cache;
-            }
-            if (selectedObject.Method == RequestProperties.HttpMethod.POST)
-            {
-                request.ContentLength = richRequest.Text.Length + encoding.GetPreamble().Length;
-                var writer = new StreamWriter(request.GetRequestStream(), encoding);
-                writer.Write(richRequest.Text);
-                writer.Close();
-            }
+            var selectedObject = propRequest.SelectedObject as RequestProperties ?? new RequestProperties();
+            selectedObject.requestPayLoad = richRequest.Text;
             try
             {
-                var response = (HttpWebResponse)request.GetResponse();
-                DumpResponse(response);
-                response.Close();
-            }
-            catch (WebException exception)
-            {
-                if (exception.Response != null)
+                var handler = new HttpClientHandler
                 {
-                    DumpResponse((HttpWebResponse)exception.Response);
-                }
-                else
+                    AllowAutoRedirect = selectedObject.AllowAutoRedirect,
+                    UseCookies = selectedObject.UseCookieContainer,
+                    CookieContainer = selectedObject.CookieContainer,
+                    UseProxy = !string.IsNullOrEmpty(selectedObject.HttpProxy),
+                    Proxy = string.IsNullOrEmpty(selectedObject.HttpProxy)
+                        ? null
+                        : new WebProxy(selectedObject.HttpProxy),
+                    PreAuthenticate = selectedObject.PreAuthenticate,
+                    UseDefaultCredentials = selectedObject.UseDefaultCredential
+                };
+                if (!string.IsNullOrEmpty(selectedObject.BasicAuthUserName))
                 {
-                    richResponse.Text = exception.ToString();
+                    handler.UseDefaultCredentials = false;
+                    handler.Credentials = new NetworkCredential(selectedObject.BasicAuthUserName,
+                        selectedObject.BasicAuthPassword);
+                }
+                using (handler)
+                using (var client = new HttpClient(handler))
+                using (var request = new HttpRequestMessage(new HttpMethod(selectedObject.Method.ToString()),
+                           selectedObject.Url))
+                {
+                    client.Timeout = selectedObject.Timeout <= 0
+                        ? Timeout.InfiniteTimeSpan
+                        : TimeSpan.FromMilliseconds(selectedObject.Timeout);
+                    if (selectedObject.Method == RequestProperties.HttpMethod.POST)
+                    {
+                        request.Content = new StringContent(richRequest.Text, Encoding.UTF8);
+                        if (!string.IsNullOrEmpty(selectedObject.ContentType))
+                        {
+                            request.Content.Headers.ContentType =
+                                System.Net.Http.Headers.MediaTypeHeaderValue.Parse(selectedObject.ContentType);
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(selectedObject.SOAPAction) &&
+                        !(selectedObject.ContentType ?? "").StartsWith("application/soap+xml",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        request.Headers.TryAddWithoutValidation("SOAPAction", "\"" + selectedObject.SOAPAction + "\"");
+                    }
+                    using (HttpResponseMessage response = client.SendAsync(request).GetAwaiter().GetResult())
+                    {
+                        richResponse.Text = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                        selectedObject.responsePayLoad = richResponse.Text;
+                    }
                 }
             }
-            catch (Exception exception2)
+            catch (Exception exception)
             {
-                richResponse.Text = exception2.ToString();
+                richResponse.Text = exception.ToString();
             }
-        }
-
-        private void SetupAssemblyResolver()
-        {
-            ResolveEventHandler handler = OnAssemblyResolve;
-            AppDomain.CurrentDomain.AssemblyResolve += handler;
         }
 
         public static void ShowMessage(object sender, MessageType status, string message)
@@ -1122,16 +973,7 @@ namespace WebServiceStudio
             {
                 if (propRequest.SelectedObject == null)
                 {
-                    propRequest.SelectedObject = new RequestProperties(null);
-                }
-            }
-            else if (((tabMain.SelectedTab == tabPageWsdl) && (treeWsdl.Nodes != null)) && (treeWsdl.Nodes.Count != 0))
-            {
-                TreeNode node = treeWsdl.Nodes[3];
-                node.Tag = GenerateClientCode();
-                if (treeWsdl.SelectedNode == node)
-                {
-                    richWsdl.Text = node.Tag.ToString();
+                    propRequest.SelectedObject = new RequestProperties();
                 }
             }
         }
@@ -1169,21 +1011,26 @@ namespace WebServiceStudio
         private void treeInput_AfterSelect(object sender, TreeViewEventArgs e)
         {
             propInput.SelectedObject = e.Node.Tag;
-            menuItemTreeInputCopy.Enabled = IsValidCopyNode(e.Node.Tag as TreeNodeProperty);
-            menuItemTreeInputPaste.Enabled = IsValidPasteNode(e.Node.Tag as TreeNodeProperty);
+            var property = e.Node.Tag as TreeNodeProperty;
+            menuItemTreeInputCopy.Enabled = IsValidCopyNode(property);
+            menuItemTreeInputPaste.Enabled = IsValidPasteNode(property);
         }
 
         private void treeInputMenuCopy_Click(object sender, EventArgs e)
         {
-            CopyToClipboard(treeInput.SelectedNode.Tag as TreeNodeProperty);
+            var property = treeInput.SelectedNode?.Tag as TreeNodeProperty;
+            if (IsValidCopyNode(property))
+            {
+                CopyToClipboard(property);
+            }
         }
 
         private void treeInputMenuPaste_Click(object sender, EventArgs e)
         {
             var tag = treeInput.SelectedNode.Tag as TreeNodeProperty;
-            if (tag is MethodProperty)
+            if (tag == null)
             {
-                throw new Exception("Paste not valid on method");
+                return;
             }
             Type[] typeList = tag.GetTypeList();
             Type type = typeof(DataSet).IsAssignableFrom(typeList[0]) ? typeof(DataSet) : typeof(object);
@@ -1205,22 +1052,48 @@ namespace WebServiceStudio
 
         private void treeMethods_AfterSelect(object sender, TreeViewEventArgs e)
         {
-            if (e.Node.Tag is MethodInfo)
+            ServiceOperation operation = e.Node.Tag as ServiceOperation;
+            if (operation != null)
             {
-                var tag = e.Node.Tag as MethodInfo;
+                requestParameters = operation.CreateParameters();
                 treeInput.Nodes.Clear();
-                var property = new MethodProperty(GetProxyPropertyFromNode(e.Node), tag);
-                property.RecreateSubtree(null);
-                treeInput.Nodes.Add(property.TreeNode);
-                e.Node.Tag = property.TreeNode;
-            }
-            else if (e.Node.Tag is TreeNode)
-            {
-                treeInput.Nodes.Clear();
-                treeInput.Nodes.Add((TreeNode)e.Node.Tag);
+                foreach (SoapParameter parameter in requestParameters)
+                {
+                    AddParameterNode(treeInput.Nodes, parameter);
+                }
+                richRequest.Text = operation.CreateEnvelope(requestParameters);
+                propRequest.SelectedObject = new RequestProperties
+                {
+                    Method = RequestProperties.HttpMethod.POST,
+                    Url = operation.Endpoint,
+                    SOAPAction = operation.Action,
+                    ContentType = operation.Soap12
+                        ? "application/soap+xml; charset=utf-8" +
+                          (string.IsNullOrEmpty(operation.Action) ? "" : "; action=\"" + operation.Action + "\"")
+                        : "text/xml; charset=utf-8",
+                    requestPayLoad = richRequest.Text,
+                    AllowAutoRedirect = true,
+                    Timeout = 10000
+                };
+                propInput.SelectedObject = null;
+                treeOutput.Nodes.Clear();
+                propOutput.SelectedObject = null;
+                if (treeInput.Nodes.Count > 0)
+                {
+                    treeInput.SelectedNode = treeInput.Nodes[0];
+                }
             }
             treeInput.ExpandAll();
-            treeInput.SelectedNode = treeInput.Nodes[0];
+        }
+
+        private static void AddParameterNode(TreeNodeCollection nodes, SoapParameter parameter)
+        {
+            TreeNode node = nodes.Add(parameter.Name);
+            node.Tag = parameter;
+            foreach (SoapParameter child in parameter.Children)
+            {
+                AddParameterNode(node.Nodes, child);
+            }
         }
 
         private void treeOutput_AfterSelect(object sender, TreeViewEventArgs e)
@@ -1236,7 +1109,7 @@ namespace WebServiceStudio
 
         private void treeWsdl_AfterSelect(object sender, TreeViewEventArgs e)
         {
-            if ((e.Node.Tag != null) && (richWsdl.Tag != e.Node.Tag))
+            if ((e.Node.Tag != null) && !Equals(richWsdl.Tag, e.Node.Tag))
             {
                 richWsdl.Text = e.Node.Tag.ToString();
                 richWsdl.Tag = e.Node.Tag;
@@ -1254,7 +1127,7 @@ namespace WebServiceStudio
             FillWsdlTab();
             if (genDone)
             {
-                ShowMessageInternal(this, MessageType.Begin, "Reflecting Proxy Assembly");
+                ShowMessageInternal(this, MessageType.Begin, "Loading SOAP operations");
                 FillInvokeTab();
                 tabMain.SelectedTab = tabPageInvoke;
                 ShowMessageInternal(this, MessageType.Success, "Ready To Invoke");

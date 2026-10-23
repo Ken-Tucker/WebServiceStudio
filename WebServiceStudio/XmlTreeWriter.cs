@@ -59,8 +59,16 @@ namespace WebServiceStudio
 
         public void FillTree(string xml, TreeNode root)
         {
+            if (xml.Length > 4 * 1024 * 1024)
+            {
+                throw new InvalidDataException("XML exceeds the 4 MB display limit.");
+            }
             current = root;
-            reader = new XmlTextReader(new StringReader(xml));
+            reader = new XmlTextReader(new StringReader(xml))
+            {
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null
+            };
             initPositions(xml);
             WriteNode(reader, true);
         }

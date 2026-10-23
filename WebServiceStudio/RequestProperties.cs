@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Web.Services.Protocols;
+using System.Net;
 
 namespace WebServiceStudio
 {
@@ -12,41 +11,26 @@ namespace WebServiceStudio
         }
 
         public bool allowAutoRedirect = true;
-        public bool allowWriteStreamBuffering = true;
         public string basicAuthPassword;
         public string basicAuthUserName;
         public string contentType;
-        public bool keepAlive;
         public HttpMethod method;
-        public bool pipelined;
         public bool preAuthenticate;
         public string proxy;
         public string requestPayLoad;
         public string responsePayLoad;
-        public bool sendChunked;
         public string soapAction;
         public int timeout = 0x2710;
         public string url;
         public bool useCookieContainer;
         public bool useDefaultCredential;
+        internal CookieContainer CookieContainer { get; } = new CookieContainer();
 
-        public RequestProperties(HttpWebClientProtocol proxy)
+        public RequestProperties()
         {
-            if (proxy != null)
-            {
-                Method = HttpMethod.POST;
-                preAuthenticate = proxy.PreAuthenticate;
-                timeout = proxy.Timeout;
-                useCookieContainer = proxy.CookieContainer != null;
-                var protocol = proxy as SoapHttpClientProtocol;
-                if (protocol != null)
-                {
-                    allowAutoRedirect = protocol.AllowAutoRedirect;
-                    allowWriteStreamBuffering = protocol.AllowAutoRedirect;
-                    var proxy2 = protocol.Proxy as WebProxy;
-                    HttpProxy = ((proxy2 != null) && (proxy2.Address != null)) ? proxy2.Address.ToString() : null;
-                }
-            }
+            Method = HttpMethod.POST;
+            contentType = "text/xml; charset=utf-8";
+            timeout = 10000;
         }
 
         public string __RequestProperties__
@@ -58,12 +42,6 @@ namespace WebServiceStudio
         {
             get { return allowAutoRedirect; }
             set { allowAutoRedirect = value; }
-        }
-
-        public bool AllowWriteStreamBuffering
-        {
-            get { return allowWriteStreamBuffering; }
-            set { allowWriteStreamBuffering = value; }
         }
 
         public string BasicAuthPassword
@@ -90,34 +68,16 @@ namespace WebServiceStudio
             set { proxy = ((value == null) || (value.Length == 0)) ? null : new WebProxy(value).Address.ToString(); }
         }
 
-        public bool KeepAlive
-        {
-            get { return keepAlive; }
-            set { keepAlive = value; }
-        }
-
         public HttpMethod Method
         {
             get { return method; }
             set { method = value; }
         }
 
-        public bool Pipelined
-        {
-            get { return pipelined; }
-            set { pipelined = value; }
-        }
-
         public bool PreAuthenticate
         {
             get { return preAuthenticate; }
             set { preAuthenticate = value; }
-        }
-
-        public bool SendChunked
-        {
-            get { return sendChunked; }
-            set { sendChunked = value; }
         }
 
         public string SOAPAction
