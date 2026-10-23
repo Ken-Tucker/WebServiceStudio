@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -541,18 +542,85 @@ namespace WebServiceStudio
 
         public string CreateEnvelope()
         {
+            return CreateEnvelope(CreateParameters());
+        }
+
+        public IList<SoapParameter> CreateParameters()
+        {
+            XElement body = XDocument.Parse(BodyXml).Root?.Element(
+                Soap12
+                    ? XNamespace.Get("http://www.w3.org/2003/05/soap-envelope") + "Body"
+                    : XNamespace.Get("http://schemas.xmlsoap.org/soap/envelope/") + "Body");
+            return body == null
+                ? new List<SoapParameter>()
+                : body.Elements().Select(element => new SoapParameter(element)).ToList();
+        }
+
+        public string CreateEnvelope(IEnumerable<SoapParameter> parameters)
+        {
             XNamespace envelope = Soap12
                 ? "http://www.w3.org/2003/05/soap-envelope"
                 : "http://schemas.xmlsoap.org/soap/envelope/";
-            XElement body = XDocument.Parse(BodyXml).Root.Element(envelope + "Body");
             return new XDocument(new XElement(envelope + "Envelope",
                 new XAttribute(XNamespace.Xmlns + "soap", envelope),
-                new XElement(envelope + "Body", body.Elements()))).ToString();
+                new XElement(envelope + "Body", parameters.Select(parameter => parameter.ToXElement())))).ToString();
         }
 
         public override string ToString()
         {
             return ServiceName + "." + Name;
+        }
+    }
+
+    internal sealed class SoapParameter
+    {
+        private readonly List<SoapParameter> children = new List<SoapParameter>();
+        private readonly XName xmlName;
+        private string value;
+
+        public SoapParameter(XElement element, int depth = 0)
+        {
+            xmlName = element.Name;
+            value = element.HasElements ? "" : element.Value;
+            if (depth < 16)
+            {
+                foreach (XElement child in element.Elements().Take(64))
+                {
+                    children.Add(new SoapParameter(child, depth + 1));
+                }
+            }
+        }
+
+        [ReadOnly(true)]
+        public string Name
+        {
+            get { return xmlName.LocalName; }
+        }
+
+        public string Value
+        {
+            get { return value; }
+            set { this.value = value ?? ""; }
+        }
+
+        [Browsable(false)]
+        public IList<SoapParameter> Children
+        {
+            get { return children; }
+        }
+
+        public XElement ToXElement()
+        {
+            var element = new XElement(xmlName);
+            if (!string.IsNullOrEmpty(value))
+            {
+                element.Add(new XText(value));
+            }
+            foreach (SoapParameter child in children)
+            {
+                element.Add(child.ToXElement());
+            }
+            return element;
         }
     }
 }

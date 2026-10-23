@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
@@ -84,6 +85,7 @@ namespace WebServiceStudio
         private TreeView treeOutput;
         private TreeView treeWsdl;
         private Wsdl wsdl;
+        private IList<SoapParameter> requestParameters = new List<SoapParameter>();
 
         public MainForm()
         {
@@ -630,6 +632,7 @@ namespace WebServiceStudio
                 ? "application/soap+xml; charset=utf-8" +
                   (string.IsNullOrEmpty(operation.Action) ? "" : "; action=\"" + operation.Action + "\"")
                 : "text/xml; charset=utf-8";
+            richRequest.Text = operation.CreateEnvelope(requestParameters);
             properties.requestPayLoad = richRequest.Text;
             propRequest.SelectedObject = properties;
             richResponse.Clear();
@@ -1008,18 +1011,27 @@ namespace WebServiceStudio
         private void treeInput_AfterSelect(object sender, TreeViewEventArgs e)
         {
             propInput.SelectedObject = e.Node.Tag;
-            menuItemTreeInputCopy.Enabled = IsValidCopyNode(e.Node.Tag as TreeNodeProperty);
-            menuItemTreeInputPaste.Enabled = IsValidPasteNode(e.Node.Tag as TreeNodeProperty);
+            var property = e.Node.Tag as TreeNodeProperty;
+            menuItemTreeInputCopy.Enabled = IsValidCopyNode(property);
+            menuItemTreeInputPaste.Enabled = IsValidPasteNode(property);
         }
 
         private void treeInputMenuCopy_Click(object sender, EventArgs e)
         {
-            CopyToClipboard(treeInput.SelectedNode.Tag as TreeNodeProperty);
+            var property = treeInput.SelectedNode?.Tag as TreeNodeProperty;
+            if (IsValidCopyNode(property))
+            {
+                CopyToClipboard(property);
+            }
         }
 
         private void treeInputMenuPaste_Click(object sender, EventArgs e)
         {
             var tag = treeInput.SelectedNode.Tag as TreeNodeProperty;
+            if (tag == null)
+            {
+                return;
+            }
             Type[] typeList = tag.GetTypeList();
             Type type = typeof(DataSet).IsAssignableFrom(typeList[0]) ? typeof(DataSet) : typeof(object);
             var serializer = new XmlSerializer(type, typeList);
@@ -1043,9 +1055,13 @@ namespace WebServiceStudio
             ServiceOperation operation = e.Node.Tag as ServiceOperation;
             if (operation != null)
             {
+                requestParameters = operation.CreateParameters();
                 treeInput.Nodes.Clear();
-                treeInput.Nodes.Add(operation.ToString()).Tag = operation;
-                richRequest.Text = operation.CreateEnvelope();
+                foreach (SoapParameter parameter in requestParameters)
+                {
+                    AddParameterNode(treeInput.Nodes, parameter);
+                }
+                richRequest.Text = operation.CreateEnvelope(requestParameters);
                 propRequest.SelectedObject = new RequestProperties
                 {
                     Method = RequestProperties.HttpMethod.POST,
@@ -1059,8 +1075,25 @@ namespace WebServiceStudio
                     AllowAutoRedirect = true,
                     Timeout = 10000
                 };
+                propInput.SelectedObject = null;
+                treeOutput.Nodes.Clear();
+                propOutput.SelectedObject = null;
+                if (treeInput.Nodes.Count > 0)
+                {
+                    treeInput.SelectedNode = treeInput.Nodes[0];
+                }
             }
             treeInput.ExpandAll();
+        }
+
+        private static void AddParameterNode(TreeNodeCollection nodes, SoapParameter parameter)
+        {
+            TreeNode node = nodes.Add(parameter.Name);
+            node.Tag = parameter;
+            foreach (SoapParameter child in parameter.Children)
+            {
+                AddParameterNode(node.Nodes, child);
+            }
         }
 
         private void treeOutput_AfterSelect(object sender, TreeViewEventArgs e)
@@ -1094,7 +1127,7 @@ namespace WebServiceStudio
             FillWsdlTab();
             if (genDone)
             {
-                ShowMessageInternal(this, MessageType.Begin, "Reflecting Proxy Assembly");
+                ShowMessageInternal(this, MessageType.Begin, "Loading SOAP operations");
                 FillInvokeTab();
                 tabMain.SelectedTab = tabPageInvoke;
                 ShowMessageInternal(this, MessageType.Success, "Ready To Invoke");
