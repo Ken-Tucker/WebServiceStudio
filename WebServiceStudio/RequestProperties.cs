@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Web.Services.Protocols;
+using System.Net;
 
 namespace WebServiceStudio
 {
@@ -30,23 +29,21 @@ namespace WebServiceStudio
         public bool useCookieContainer;
         public bool useDefaultCredential;
 
-        public RequestProperties(HttpWebClientProtocol proxy)
+        public RequestProperties()
         {
-            if (proxy != null)
-            {
-                Method = HttpMethod.POST;
-                preAuthenticate = proxy.PreAuthenticate;
-                timeout = proxy.Timeout;
-                useCookieContainer = proxy.CookieContainer != null;
-                var protocol = proxy as SoapHttpClientProtocol;
-                if (protocol != null)
-                {
-                    allowAutoRedirect = protocol.AllowAutoRedirect;
-                    allowWriteStreamBuffering = protocol.AllowAutoRedirect;
-                    var proxy2 = protocol.Proxy as WebProxy;
-                    HttpProxy = ((proxy2 != null) && (proxy2.Address != null)) ? proxy2.Address.ToString() : null;
-                }
-            }
+        }
+
+        public RequestProperties(WsdlOperation operation)
+        {
+            Method = HttpMethod.POST;
+            Url = operation.Endpoint;
+            SOAPAction = operation.SoapAction;
+            ContentType = operation.IsSoap12
+                ? "application/soap+xml; charset=utf-8"
+                : "text/xml; charset=utf-8";
+            UseCookieContainer = true;
+            UseDefaultCredential = true;
+            HttpProxy = Configuration.MasterConfig.WsdlSettings.ProxyServer;
         }
 
         public string __RequestProperties__
