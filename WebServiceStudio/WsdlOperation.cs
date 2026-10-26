@@ -20,6 +20,8 @@ namespace WebServiceStudio
         public bool IsSoap12 { get; set; }
 
         public List<XmlElement> RequestElements { get; } = new List<XmlElement>();
+
+        public RequestProperties RequestProperties { get; set; }
     }
 
     internal class WsdlOperationProperty : TreeNodeProperty

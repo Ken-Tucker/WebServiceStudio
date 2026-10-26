@@ -661,8 +661,12 @@ namespace WebServiceStudio
             WsdlOperationProperty operationProperty = GetCurrentOperationProperty();
             if (operationProperty != null)
             {
-                var properties = propRequest.SelectedObject as RequestProperties ??
-                    new RequestProperties(operationProperty.Operation);
+                var properties = operationProperty.Operation.RequestProperties;
+                if (properties == null)
+                {
+                    properties = new RequestProperties(operationProperty.Operation);
+                    operationProperty.Operation.RequestProperties = properties;
+                }
                 try
                 {
                     SoapHttpResult result = SoapHttpClient.Invoke(operationProperty.Operation,
@@ -1155,7 +1159,6 @@ namespace WebServiceStudio
                 property.RecreateSubtree(null);
                 treeInput.Nodes.Add(property.TreeNode);
                 e.Node.Tag = property.TreeNode;
-                propRequest.SelectedObject = new RequestProperties(operation);
             }
             else if (e.Node.Tag is TreeNode)
             {
@@ -1167,6 +1170,15 @@ namespace WebServiceStudio
                 treeInput.Nodes.Clear();
                 propInput.SelectedObject = null;
                 return;
+            }
+            var operationProperty = treeInput.Nodes[0].Tag as WsdlOperationProperty;
+            if (operationProperty != null)
+            {
+                if (operationProperty.Operation.RequestProperties == null)
+                {
+                    operationProperty.Operation.RequestProperties = new RequestProperties(operationProperty.Operation);
+                }
+                propRequest.SelectedObject = operationProperty.Operation.RequestProperties;
             }
             treeInput.ExpandAll();
             if (treeInput.Nodes.Count > 0)

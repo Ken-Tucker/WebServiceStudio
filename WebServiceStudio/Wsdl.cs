@@ -132,105 +132,6 @@ namespace WebServiceStudio
             return protocol;
         }
 
-        private static XmlSchema CreateFakeSoapEncodingSchema(string ns, string name)
-        {
-            var schema = new XmlSchema();
-            schema.TargetNamespace = ns;
-            var item = new XmlSchemaGroup();
-            item.Name = "Array";
-            var sequence = new XmlSchemaSequence();
-            var any = new XmlSchemaAny();
-            any.MinOccurs = 0M;
-            any.MaxOccurs = 79228162514264337593543950335M;
-            sequence.Items.Add(any);
-            any.Namespace = "##any";
-            any.ProcessContents = XmlSchemaContentProcessing.Lax;
-            item.Particle = sequence;
-            schema.Items.Add(item);
-            var type = new XmlSchemaComplexType();
-            type.Name = name;
-            var ref2 = new XmlSchemaGroupRef();
-            ref2.RefName = new XmlQualifiedName("Array", ns);
-            type.Particle = ref2;
-            var attribute = new XmlSchemaAttribute();
-            attribute.RefName = new XmlQualifiedName("arrayType", ns);
-            type.Attributes.Add(attribute);
-            schema.Items.Add(type);
-            attribute = new XmlSchemaAttribute();
-            attribute.Use = XmlSchemaUse.None;
-            attribute.Name = "arrayType";
-            schema.Items.Add(attribute);
-            AddSimpleType(schema, "base64", "base64Binary");
-            AddElementAndType(schema, "anyURI", ns);
-            AddElementAndType(schema, "base64Binary", ns);
-            AddElementAndType(schema, "boolean", ns);
-            AddElementAndType(schema, "byte", ns);
-            AddElementAndType(schema, "date", ns);
-            AddElementAndType(schema, "dateTime", ns);
-            AddElementAndType(schema, "decimal", ns);
-            AddElementAndType(schema, "double", ns);
-            AddElementAndType(schema, "duration", ns);
-            AddElementAndType(schema, "ENTITIES", ns);
-            AddElementAndType(schema, "ENTITY", ns);
-            AddElementAndType(schema, "float", ns);
-            AddElementAndType(schema, "gDay", ns);
-            AddElementAndType(schema, "gMonth", ns);
-            AddElementAndType(schema, "gMonthDay", ns);
-            AddElementAndType(schema, "gYear", ns);
-            AddElementAndType(schema, "gYearMonth", ns);
-            AddElementAndType(schema, "hexBinary", ns);
-            AddElementAndType(schema, "ID", ns);
-            AddElementAndType(schema, "IDREF", ns);
-            AddElementAndType(schema, "IDREFS", ns);
-            AddElementAndType(schema, "int", ns);
-            AddElementAndType(schema, "integer", ns);
-            AddElementAndType(schema, "language", ns);
-            AddElementAndType(schema, "long", ns);
-            AddElementAndType(schema, "Name", ns);
-            AddElementAndType(schema, "NCName", ns);
-            AddElementAndType(schema, "negativeInteger", ns);
-            AddElementAndType(schema, "NMTOKEN", ns);
-            AddElementAndType(schema, "NMTOKENS", ns);
-            AddElementAndType(schema, "nonNegativeInteger", ns);
-            AddElementAndType(schema, "nonPositiveInteger", ns);
-            AddElementAndType(schema, "normalizedString", ns);
-            AddElementAndType(schema, "positiveInteger", ns);
-            AddElementAndType(schema, "QName", ns);
-            AddElementAndType(schema, "short", ns);
-            AddElementAndType(schema, "string", ns);
-            AddElementAndType(schema, "time", ns);
-            AddElementAndType(schema, "token", ns);
-            AddElementAndType(schema, "unsignedByte", ns);
-            AddElementAndType(schema, "unsignedInt", ns);
-            AddElementAndType(schema, "unsignedLong", ns);
-            AddElementAndType(schema, "unsignedShort", ns);
-            return schema;
-        }
-
-        private static XmlSchema CreateFakeWsdlSchema(string ns)
-        {
-            var schema = new XmlSchema();
-            schema.TargetNamespace = ns;
-            var item = new XmlSchemaAttribute();
-            item.Use = XmlSchemaUse.None;
-            item.Name = "arrayType";
-            item.SchemaTypeName = new XmlQualifiedName("QName", "http://www.w3.org/2001/XMLSchema");
-            schema.Items.Add(item);
-            return schema;
-        }
-
-        private static XmlSchema CreateFakeXsdSchema(string ns, string name)
-        {
-            var schema = new XmlSchema();
-            schema.TargetNamespace = ns;
-            var item = new XmlSchemaElement();
-            item.Name = name;
-            var type = new XmlSchemaComplexType();
-            item.SchemaType = type;
-            schema.Items.Add(item);
-            return schema;
-        }
-
         private static bool FileExists(string path)
         {
             bool flag = false;
@@ -605,6 +506,16 @@ namespace WebServiceStudio
                 parent.AppendChild(CreateElement(document, element, schemas, depth));
                 return;
             }
+            var groupReference = particle as XmlSchemaGroupRef;
+            if (groupReference != null)
+            {
+                XmlSchemaGroup schemaGroup = FindSchemaGroup(schemas, groupReference.RefName);
+                if (schemaGroup != null)
+                {
+                    AppendParticle(document, parent, schemaGroup.Particle, schemas, depth + 1);
+                }
+                return;
+            }
             var group = particle as XmlSchemaGroupBase;
             if (group != null)
             {
@@ -614,6 +525,22 @@ namespace WebServiceStudio
                     AppendParticle(document, parent, group.Items[i] as XmlSchemaParticle, schemas, depth + 1);
                 }
             }
+        }
+
+        private static XmlSchemaGroup FindSchemaGroup(XmlSchemaSet schemas, XmlQualifiedName name)
+        {
+            foreach (XmlSchema schema in schemas.Schemas())
+            {
+                if (schema.TargetNamespace == name.Namespace)
+                {
+                    var group = schema.Groups[name.Name] as XmlSchemaGroup;
+                    if (group != null)
+                    {
+                        return group;
+                    }
+                }
+            }
+            return null;
         }
 
         private void GetPaths(StringCollection localPaths, StringCollection urls)
@@ -737,16 +664,6 @@ namespace WebServiceStudio
             return obj2;
         }
 
-        public static XmlSchema ReadSchema(string filename)
-        {
-            var reader = new XmlTextReader(filename);
-            if (reader.IsStartElement("schema", "http://www.w3.org/2001/XMLSchema"))
-            {
-                return XmlSchema.Read(reader, null);
-            }
-            return null;
-        }
-
         public void Reset()
         {
             paths.Clear();
@@ -754,11 +671,6 @@ namespace WebServiceStudio
             xsds.Clear();
             operations.Clear();
             cancelled = false;
-        }
-
-        private void ValidationCallbackWithErrorCode(object sender, ValidationEventArgs args)
-        {
-            CheckPoint(MessageType.Warning, "Schema parsing error " + args.Message);
         }
 
         internal class Namespace
