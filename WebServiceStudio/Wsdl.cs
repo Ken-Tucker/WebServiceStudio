@@ -1,15 +1,9 @@
-﻿using Microsoft.CSharp;
-using Microsoft.VisualBasic;
 using System;
-using System.CodeDom;
-using System.CodeDom.Compiler;
 using System.Collections;
 using System.Collections.Specialized;
-using System.Data;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Reflection;
-using System.Web.Services;
 using System.Web.Services.Description;
 using System.Web.Services.Discovery;
 using System.Xml;
@@ -26,48 +20,15 @@ namespace WebServiceStudio
         private static readonly string duplicateService =
             "Warning: Ignoring duplicate service description with TargetNamespace='{0}' from '{1}'.";
 
-        private static readonly string schemaValidationFailure =
-            "Schema could not be validated. Class generation may fail or may produce incorrect results";
-
         private readonly StringCollection paths = new StringCollection();
         private readonly StringCollection wsdls = new StringCollection();
         private readonly StringCollection xsds = new StringCollection();
+        private readonly List<WsdlOperation> operations = new List<WsdlOperation>();
         private bool cancelled;
-        private CodeDomProvider codeProvider;
-        private CodeCompileUnit compileUnit;
-        private Assembly proxyAssembly;
-        private string proxyCode = "<NOT YET>";
-        private string proxyNamespace = "";
 
         public StringCollection Paths
         {
             get { return paths; }
-        }
-
-        public Assembly ProxyAssembly
-        {
-            get { return proxyAssembly; }
-        }
-
-        public string ProxyCode
-        {
-            get { return proxyCode; }
-        }
-
-        public CodeCompileUnit ProxyCodeDom
-        {
-            get { return compileUnit; }
-        }
-
-        public string ProxyFileExtension
-        {
-            get { return WsdlProperties.Language.ToString(); }
-        }
-
-        public string ProxyNamespace
-        {
-            get { return proxyNamespace; }
-            set { proxyNamespace = value; }
         }
 
         public WsdlProperties WsdlProperties
@@ -83,6 +44,11 @@ namespace WebServiceStudio
         public StringCollection Xsds
         {
             get { return xsds; }
+        }
+
+        public IList<WsdlOperation> Operations
+        {
+            get { return operations; }
         }
 
         private void AddDocument(string path, object document, XmlSchemas schemas,
@@ -129,87 +95,9 @@ namespace WebServiceStudio
             }
         }
 
-        private static void AddElementAndType(XmlSchema schema, string baseXsdType, string ns)
-        {
-            var item = new XmlSchemaElement();
-            item.Name = baseXsdType;
-            item.SchemaTypeName = new XmlQualifiedName(baseXsdType, ns);
-            schema.Items.Add(item);
-            var type = new XmlSchemaComplexType();
-            type.Name = baseXsdType;
-            var content = new XmlSchemaSimpleContent();
-            type.ContentModel = content;
-            var extension = new XmlSchemaSimpleContentExtension();
-            extension.BaseTypeName = new XmlQualifiedName(baseXsdType, "http://www.w3.org/2001/XMLSchema");
-            content.Content = extension;
-            schema.Items.Add(type);
-        }
-
-        private static void AddFakeSchemas(XmlSchema parent, XmlSchemas schemas)
-        {
-            if (schemas["http://www.w3.org/2001/XMLSchema"] == null)
-            {
-                var item = new XmlSchemaImport();
-                item.Namespace = "http://www.w3.org/2001/XMLSchema";
-                item.Schema = CreateFakeXsdSchema("http://www.w3.org/2001/XMLSchema", "schema");
-                parent.Includes.Add(item);
-            }
-            if (schemas["http://schemas.xmlsoap.org/soap/encoding/"] == null)
-            {
-                var import2 = new XmlSchemaImport();
-                import2.Namespace = "http://schemas.xmlsoap.org/soap/encoding/";
-                import2.Schema = CreateFakeSoapEncodingSchema("http://schemas.xmlsoap.org/soap/encoding/", "Array");
-                parent.Includes.Add(import2);
-            }
-            if (schemas["http://schemas.xmlsoap.org/wsdl/"] == null)
-            {
-                var import3 = new XmlSchemaImport();
-                import3.Namespace = "http://schemas.xmlsoap.org/wsdl/";
-                import3.Schema = CreateFakeWsdlSchema("http://schemas.xmlsoap.org/wsdl/");
-                parent.Includes.Add(import3);
-            }
-        }
-
-        private static void AddSimpleType(XmlSchema schema, string typeName, string baseXsdType)
-        {
-            var item = new XmlSchemaSimpleType();
-            item.Name = typeName;
-            var restriction = new XmlSchemaSimpleTypeRestriction();
-            restriction.BaseTypeName = new XmlQualifiedName(baseXsdType, "http://www.w3.org/2001/XMLSchema");
-            item.Content = restriction;
-            schema.Items.Add(item);
-        }
-
         public void Cancel()
         {
             cancelled = true;
-        }
-
-        private void ChangeBaseType(CodeCompileUnit compileUnit)
-        {
-            if ((WsdlProperties.ProxyBaseType != null) && (WsdlProperties.ProxyBaseType.Length != 0))
-            {
-                Type type = Type.GetType(WsdlProperties.ProxyBaseType, true);
-                foreach (CodeNamespace namespace2 in compileUnit.Namespaces)
-                {
-                    foreach (CodeTypeDeclaration declaration in namespace2.Types)
-                    {
-                        bool flag = false;
-                        foreach (CodeAttributeDeclaration declaration2 in declaration.CustomAttributes)
-                        {
-                            if (declaration2.Name == typeof(WebServiceBindingAttribute).FullName)
-                            {
-                                flag = true;
-                                break;
-                            }
-                        }
-                        if (flag)
-                        {
-                            declaration.BaseTypes[0] = new CodeTypeReference(type.FullName);
-                        }
-                    }
-                }
-            }
         }
 
         private void CheckPoint(MessageType status, string message)
@@ -217,120 +105,6 @@ namespace WebServiceStudio
             if (!cancelled)
             {
                 MainForm.ShowMessage(this, status, message);
-            }
-        }
-
-        private static void CollectIncludes(XmlSchema schema, Hashtable includeSchemas)
-        {
-            XmlSchemaObjectEnumerator enumerator = schema.Includes.GetEnumerator();
-            while (enumerator.MoveNext())
-            {
-                var current = (XmlSchemaExternal)enumerator.Current;
-                string schemaLocation = current.SchemaLocation;
-                if (current is XmlSchemaImport)
-                {
-                    current.SchemaLocation = null;
-                }
-                else if (((current is XmlSchemaInclude) && (schemaLocation != null)) && (schemaLocation.Length > 0))
-                {
-                    string str2 = Path.GetFullPath(schemaLocation).ToLower();
-                    if (includeSchemas[str2] == null)
-                    {
-                        XmlSchema schema2 = ReadSchema(schemaLocation);
-                        includeSchemas[str2] = schema2;
-                        CollectIncludes(schema2, includeSchemas);
-                    }
-                    current.Schema = (XmlSchema)includeSchemas[str2];
-                    current.SchemaLocation = null;
-                }
-            }
-        }
-
-        private void Compile(XmlSchemas userSchemas)
-        {
-            var parent = new XmlSchema();
-            foreach (XmlSchema schema2 in userSchemas)
-            {
-                if ((schema2.TargetNamespace != null) && (schema2.TargetNamespace.Length == 0))
-                {
-                    schema2.TargetNamespace = null;
-                }
-                if (schema2.TargetNamespace == parent.TargetNamespace)
-                {
-                    var item = new XmlSchemaInclude();
-                    item.Schema = schema2;
-                    parent.Includes.Add(item);
-                }
-                else
-                {
-                    var import = new XmlSchemaImport();
-                    import.Namespace = schema2.TargetNamespace;
-                    import.Schema = schema2;
-                    parent.Includes.Add(import);
-                }
-            }
-            AddFakeSchemas(parent, userSchemas);
-            try
-            {
-                var schemas = new XmlSchemaCollection();
-                schemas.ValidationEventHandler += ValidationCallbackWithErrorCode;
-                schemas.Add(parent);
-                if (schemas.Count == 0)
-                {
-                    CheckPoint(MessageType.Warning, schemaValidationFailure);
-                }
-            }
-            catch (Exception exception)
-            {
-                CheckPoint(MessageType.Warning, schemaValidationFailure + "\n" + exception.Message);
-            }
-        }
-
-        private void CreateCodeGenerator(out ICodeGenerator codeGen, out string fileExtension)
-        {
-            Language language = WsdlProperties.Language;
-            switch (language)
-            {
-                case Language.CS:
-                    codeProvider = new CSharpCodeProvider();
-                    break;
-
-                case Language.VB:
-                    codeProvider = new VBCodeProvider();
-                    break;
-
-                default:
-                    {
-                        if (language != Language.Custom)
-                        {
-                            throw new Exception("Unknown language");
-                        }
-                        Type type = Type.GetType(WsdlProperties.CustomCodeDomProvider);
-                        if (type == null)
-                        {
-                            throw new TypeLoadException("Type '" + WsdlProperties.CustomCodeDomProvider + "' is not found");
-                        }
-                        codeProvider = (CodeDomProvider)Activator.CreateInstance(type);
-                        break;
-                    }
-            }
-            if (codeProvider != null)
-            {
-                codeGen = codeProvider.CreateGenerator();
-                fileExtension = codeProvider.FileExtension;
-                if (fileExtension == null)
-                {
-                    fileExtension = string.Empty;
-                }
-                else if ((fileExtension.Length > 0) && (fileExtension[0] != '.'))
-                {
-                    fileExtension = "." + fileExtension;
-                }
-            }
-            else
-            {
-                fileExtension = ".src";
-                codeGen = null;
             }
         }
 
@@ -358,105 +132,6 @@ namespace WebServiceStudio
             return protocol;
         }
 
-        private static XmlSchema CreateFakeSoapEncodingSchema(string ns, string name)
-        {
-            var schema = new XmlSchema();
-            schema.TargetNamespace = ns;
-            var item = new XmlSchemaGroup();
-            item.Name = "Array";
-            var sequence = new XmlSchemaSequence();
-            var any = new XmlSchemaAny();
-            any.MinOccurs = 0M;
-            any.MaxOccurs = 79228162514264337593543950335M;
-            sequence.Items.Add(any);
-            any.Namespace = "##any";
-            any.ProcessContents = XmlSchemaContentProcessing.Lax;
-            item.Particle = sequence;
-            schema.Items.Add(item);
-            var type = new XmlSchemaComplexType();
-            type.Name = name;
-            var ref2 = new XmlSchemaGroupRef();
-            ref2.RefName = new XmlQualifiedName("Array", ns);
-            type.Particle = ref2;
-            var attribute = new XmlSchemaAttribute();
-            attribute.RefName = new XmlQualifiedName("arrayType", ns);
-            type.Attributes.Add(attribute);
-            schema.Items.Add(type);
-            attribute = new XmlSchemaAttribute();
-            attribute.Use = XmlSchemaUse.None;
-            attribute.Name = "arrayType";
-            schema.Items.Add(attribute);
-            AddSimpleType(schema, "base64", "base64Binary");
-            AddElementAndType(schema, "anyURI", ns);
-            AddElementAndType(schema, "base64Binary", ns);
-            AddElementAndType(schema, "boolean", ns);
-            AddElementAndType(schema, "byte", ns);
-            AddElementAndType(schema, "date", ns);
-            AddElementAndType(schema, "dateTime", ns);
-            AddElementAndType(schema, "decimal", ns);
-            AddElementAndType(schema, "double", ns);
-            AddElementAndType(schema, "duration", ns);
-            AddElementAndType(schema, "ENTITIES", ns);
-            AddElementAndType(schema, "ENTITY", ns);
-            AddElementAndType(schema, "float", ns);
-            AddElementAndType(schema, "gDay", ns);
-            AddElementAndType(schema, "gMonth", ns);
-            AddElementAndType(schema, "gMonthDay", ns);
-            AddElementAndType(schema, "gYear", ns);
-            AddElementAndType(schema, "gYearMonth", ns);
-            AddElementAndType(schema, "hexBinary", ns);
-            AddElementAndType(schema, "ID", ns);
-            AddElementAndType(schema, "IDREF", ns);
-            AddElementAndType(schema, "IDREFS", ns);
-            AddElementAndType(schema, "int", ns);
-            AddElementAndType(schema, "integer", ns);
-            AddElementAndType(schema, "language", ns);
-            AddElementAndType(schema, "long", ns);
-            AddElementAndType(schema, "Name", ns);
-            AddElementAndType(schema, "NCName", ns);
-            AddElementAndType(schema, "negativeInteger", ns);
-            AddElementAndType(schema, "NMTOKEN", ns);
-            AddElementAndType(schema, "NMTOKENS", ns);
-            AddElementAndType(schema, "nonNegativeInteger", ns);
-            AddElementAndType(schema, "nonPositiveInteger", ns);
-            AddElementAndType(schema, "normalizedString", ns);
-            AddElementAndType(schema, "positiveInteger", ns);
-            AddElementAndType(schema, "QName", ns);
-            AddElementAndType(schema, "short", ns);
-            AddElementAndType(schema, "string", ns);
-            AddElementAndType(schema, "time", ns);
-            AddElementAndType(schema, "token", ns);
-            AddElementAndType(schema, "unsignedByte", ns);
-            AddElementAndType(schema, "unsignedInt", ns);
-            AddElementAndType(schema, "unsignedLong", ns);
-            AddElementAndType(schema, "unsignedShort", ns);
-            return schema;
-        }
-
-        private static XmlSchema CreateFakeWsdlSchema(string ns)
-        {
-            var schema = new XmlSchema();
-            schema.TargetNamespace = ns;
-            var item = new XmlSchemaAttribute();
-            item.Use = XmlSchemaUse.None;
-            item.Name = "arrayType";
-            item.SchemaTypeName = new XmlQualifiedName("QName", "http://www.w3.org/2001/XMLSchema");
-            schema.Items.Add(item);
-            return schema;
-        }
-
-        private static XmlSchema CreateFakeXsdSchema(string ns, string name)
-        {
-            var schema = new XmlSchema();
-            schema.TargetNamespace = ns;
-            var item = new XmlSchemaElement();
-            item.Name = name;
-            var type = new XmlSchemaComplexType();
-            item.SchemaType = type;
-            schema.Items.Add(item);
-            return schema;
-        }
-
         private static bool FileExists(string path)
         {
             bool flag = false;
@@ -482,28 +157,10 @@ namespace WebServiceStudio
             var urls = new StringCollection();
             var localPaths = new StringCollection();
             GetPaths(localPaths, urls);
-            descriptions.Clear();
-            schemas.Clear();
-            if ((localPaths != null) && (localPaths.Count > 0))
-            {
-                string path = localPaths[0];
-                string extension = Path.GetExtension(path);
-                if ((string.Compare(extension, ".exe", true) == 0) || (string.Compare(extension, ".dll", true) == 0))
-                {
-                    CheckPoint(MessageType.Begin, "Loading Assembly");
-                    proxyAssembly = Assembly.LoadFrom(path);
-                    if (proxyAssembly != null)
-                    {
-                        CheckPoint(MessageType.Success, "Loaded Assembly");
-                    }
-                    else
-                    {
-                        CheckPoint(MessageType.Failure, "Failed to load Assembly");
-                    }
-                    return;
-                }
-            }
-            CheckPoint(MessageType.Begin, "Generating WSDL");
+            operations.Clear();
+            wsdls.Clear();
+            xsds.Clear();
+            CheckPoint(MessageType.Begin, "Reading WSDL");
             try
             {
                 DiscoveryClientProtocol client = CreateDiscoveryClient();
@@ -517,26 +174,13 @@ namespace WebServiceStudio
             }
             try
             {
-                ICodeGenerator generator;
-                string str3;
-                CheckPoint(MessageType.Begin, "Generating Proxy");
-                CreateCodeGenerator(out generator, out str3);
-                var userSchemas = new XmlSchemas();
-                userSchemas.Add(schemas);
-                foreach (ServiceDescription description in descriptions)
+                BuildOperations(descriptions, schemas);
+                if (operations.Count == 0)
                 {
-                    userSchemas.Add(description.Types.Schemas);
+                    CheckPoint(MessageType.Failure, "No SOAP operations were found in the WSDL.");
+                    return;
                 }
-                var includeSchemas = new Hashtable();
-                foreach (XmlSchema schema in userSchemas)
-                {
-                    CollectIncludes(schema, includeSchemas);
-                }
-                Compile(userSchemas);
-                GenerateCode(descriptions, schemas, "http://tempuri.org", generator, str3);
-                CheckPoint(MessageType.Begin, "Compiling Proxy");
-                GenerateAssembly();
-                CheckPoint(MessageType.Success, "Generated Assembly");
+                CheckPoint(MessageType.Success, "Read " + operations.Count + " SOAP operation(s)");
             }
             catch (Exception exception2)
             {
@@ -544,131 +188,359 @@ namespace WebServiceStudio
             }
         }
 
-        private void GenerateAssembly()
+        private void BuildOperations(ServiceDescriptionCollection descriptions, XmlSchemas schemas)
         {
-            ICodeCompiler compiler = codeProvider.CreateCompiler();
-            string location = "";
-            if ((WsdlProperties.ProxyBaseType != null) && (WsdlProperties.ProxyBaseType.Length > 0))
+            var schemaSet = new XmlSchemaSet();
+            schemaSet.ValidationEventHandler += (sender, args) =>
+                CheckPoint(MessageType.Warning, "Schema parsing warning: " + args.Message);
+            foreach (XmlSchema schema in schemas)
             {
-                location = Type.GetType(WsdlProperties.ProxyBaseType, true).Assembly.Location;
+                schemaSet.Add(schema);
             }
-            string[] assemblyNames =
+            foreach (ServiceDescription description in descriptions)
             {
-                "System.Xml.dll", "System.dll", "System.Web.Services.dll", "System.Data.dll",
-                Assembly.GetExecutingAssembly().Location, location
-            };
-            var options = new CompilerParameters(assemblyNames);
-            options.WarningLevel = 0;
-            options.GenerateInMemory = false;
-            CompilerResults results = compiler.CompileAssemblyFromSource(options, proxyCode);
-            if (results.Errors.HasErrors)
-            {
-                foreach (CompilerError error in results.Errors)
+                foreach (XmlSchema schema in description.Types.Schemas)
                 {
-                    CheckPoint(MessageType.Error, error.ToString());
+                    schemaSet.Add(schema);
                 }
-                throw new Exception("CompilationErrors");
             }
-            proxyAssembly = results.CompiledAssembly;
-        }
-
-        private void GenerateCode(ServiceDescriptionCollection sources, XmlSchemas schemas, string uriToWSDL,
-            ICodeGenerator codeGen, string fileExtension)
-        {
-            proxyCode = " <ERROR> ";
-            StringWriter w = null;
-            compileUnit = new CodeCompileUnit();
-            var importer = new ServiceDescriptionImporter();
-            importer.Schemas.Add(schemas);
-            foreach (ServiceDescription description in sources)
-            {
-                importer.AddServiceDescription(description, "", "");
-            }
-            importer.Style = ServiceDescriptionImportStyle.Client;
-            importer.ProtocolName = WsdlProperties.Protocol.ToString();
-            var namespace2 = new CodeNamespace(proxyNamespace);
-            compileUnit.Namespaces.Add(namespace2);
-            _ = importer.Import(namespace2, compileUnit);
             try
             {
-                try
-                {
-                    w = new StringWriter();
-                }
-                catch
-                {
-                    throw;
-                }
-                MemoryStream stream = null;
-                if (schemas.Count > 0)
-                {
-                    compileUnit.ReferencedAssemblies.Add("System.Data.dll");
-                    foreach (XmlSchema schema in schemas)
-                    {
-                        try
-                        {
-                            if (XmlSchemas.IsDataSet(schema))
-                            {
-                                if (stream == null)
-                                {
-                                    stream = new MemoryStream();
-                                }
-                                stream.Position = 0L;
-                                stream.SetLength(0L);
-                                schema.Write(stream);
-                                stream.Position = 0L;
-                                var dataSet = new DataSet();
-                                dataSet.ReadXmlSchema(stream);
-                                TypedDataSetGenerator.Generate(dataSet, namespace2, codeGen);
-                            }
-                        }
-                        catch
-                        {
-                            throw;
-                        }
-                    }
-                }
-                try
-                {
-                    GenerateVersionComment(compileUnit.Namespaces[0]);
-                    ChangeBaseType(compileUnit);
-                    codeGen.GenerateCodeFromCompileUnit(compileUnit, w, null);
-                }
-                catch (Exception exception)
-                {
-                    if (w != null)
-                    {
-                        w.Write("Exception in generating code");
-                        w.Write(exception.Message);
-                    }
-                    throw new InvalidOperationException("Error generating ", exception);
-                }
+                schemaSet.Compile();
             }
-            finally
+            catch (Exception exception)
             {
-                proxyCode = w.ToString();
-                if (w != null)
+                CheckPoint(MessageType.Warning, "Some XML schema types could not be resolved: " + exception.Message);
+            }
+
+            foreach (ServiceDescription serviceDescription in descriptions)
+            {
+                foreach (Service service in serviceDescription.Services)
                 {
-                    w.Close();
+                    foreach (Port port in service.Ports)
+                    {
+                        Binding binding = FindBinding(descriptions, port.Binding);
+                        if (binding == null)
+                        {
+                            continue;
+                        }
+                        SoapBinding soapBinding = FindExtension<SoapBinding>(binding.Extensions);
+                        Soap12Binding soap12Binding = FindExtension<Soap12Binding>(binding.Extensions);
+                        if (soapBinding == null && soap12Binding == null)
+                        {
+                            continue;
+                        }
+                        bool isSoap12 = soap12Binding != null;
+                        PortType portType = FindPortType(descriptions, binding.Type);
+                        if (portType == null)
+                        {
+                            continue;
+                        }
+                        string endpoint = GetEndpoint(port, isSoap12);
+                        foreach (OperationBinding operationBinding in binding.Operations)
+                        {
+                            Operation portOperation = FindOperation(portType, operationBinding.Name);
+                            if (portOperation == null || portOperation.Messages.Input == null ||
+                                operationBinding.Input == null)
+                            {
+                                continue;
+                            }
+                            OperationInput operationInput = portOperation.Messages.Input;
+                            Message message = FindMessage(descriptions, operationInput.Message);
+                            if (message == null)
+                            {
+                                continue;
+                            }
+                            SoapBodyBinding bodyBinding = FindExtension<SoapBodyBinding>(operationBinding.Input.Extensions);
+                            Soap12BodyBinding body12Binding = FindExtension<Soap12BodyBinding>(operationBinding.Input.Extensions);
+                            string[] selectedParts = bodyBinding != null ? bodyBinding.Parts :
+                                (body12Binding != null ? body12Binding.Parts : null);
+                            string style = GetOperationStyle(operationBinding, soapBinding, soap12Binding);
+                            string bodyNamespace = bodyBinding != null ? bodyBinding.Namespace :
+                                (body12Binding != null ? body12Binding.Namespace : binding.Type.Namespace);
+                            var operation = new WsdlOperation
+                            {
+                                Name = operationBinding.Name,
+                                ServiceName = service.Name,
+                                Endpoint = endpoint,
+                                SoapAction = GetSoapAction(operationBinding),
+                                TargetNamespace = bodyNamespace,
+                                IsSoap12 = isSoap12
+                            };
+
+                            XmlElement rpcElement = null;
+                            if (string.Equals(style, "Rpc", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var document = new XmlDocument();
+                                rpcElement = document.CreateElement(operation.Name, bodyNamespace ?? "");
+                            }
+                            foreach (MessagePart part in message.Parts)
+                            {
+                                if (selectedParts != null && selectedParts.Length > 0 &&
+                                    Array.IndexOf(selectedParts, part.Name) < 0)
+                                {
+                                    continue;
+                                }
+                                XmlElement requestElement = CreateRequestElement(part, schemaSet, bodyNamespace);
+                                if (requestElement != null)
+                                {
+                                    if (rpcElement != null)
+                                    {
+                                        rpcElement.AppendChild(rpcElement.OwnerDocument.ImportNode(requestElement, true));
+                                    }
+                                    else
+                                    {
+                                        operation.RequestElements.Add(requestElement);
+                                    }
+                                }
+                            }
+                            if (rpcElement != null)
+                            {
+                                operation.RequestElements.Add(rpcElement);
+                            }
+                            operations.Add(operation);
+                        }
+                    }
                 }
             }
         }
 
-        private static void GenerateVersionComment(CodeNamespace codeNamespace)
+        private static T FindExtension<T>(ServiceDescriptionFormatExtensionCollection extensions) where T : class
         {
-            codeNamespace.Comments.Add(new CodeCommentStatement(""));
-            AssemblyName name = Assembly.GetExecutingAssembly().GetName();
-            Version version = Environment.Version;
-            codeNamespace.Comments.Add(new CodeCommentStatement("Assembly " + name.Name + " Version = " + version));
-            codeNamespace.Comments.Add(new CodeCommentStatement(""));
+            foreach (object extension in extensions)
+            {
+                T result = extension as T;
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+            return null;
         }
 
-        public ICodeGenerator GetCodeGenerator()
+        private static Operation FindOperation(PortType portType, string name)
         {
-            ICodeGenerator generator;
-            string str;
-            CreateCodeGenerator(out generator, out str);
-            return generator;
+            foreach (Operation operation in portType.Operations)
+            {
+                if (operation.Name == name)
+                {
+                    return operation;
+                }
+            }
+            return null;
+        }
+
+        private static Binding FindBinding(ServiceDescriptionCollection descriptions, XmlQualifiedName name)
+        {
+            foreach (ServiceDescription description in descriptions)
+            {
+                foreach (Binding binding in description.Bindings)
+                {
+                    if (binding.Name == name.Name && description.TargetNamespace == name.Namespace)
+                    {
+                        return binding;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private static PortType FindPortType(ServiceDescriptionCollection descriptions, XmlQualifiedName name)
+        {
+            foreach (ServiceDescription description in descriptions)
+            {
+                foreach (PortType portType in description.PortTypes)
+                {
+                    if (portType.Name == name.Name && description.TargetNamespace == name.Namespace)
+                    {
+                        return portType;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private static Message FindMessage(ServiceDescriptionCollection descriptions, XmlQualifiedName name)
+        {
+            foreach (ServiceDescription description in descriptions)
+            {
+                foreach (Message message in description.Messages)
+                {
+                    if (message.Name == name.Name && description.TargetNamespace == name.Namespace)
+                    {
+                        return message;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private static string GetEndpoint(Port port, bool isSoap12)
+        {
+            foreach (object extension in port.Extensions)
+            {
+                var address11 = extension as SoapAddressBinding;
+                if (address11 != null && !isSoap12)
+                {
+                    return address11.Location;
+                }
+                var address12 = extension as Soap12AddressBinding;
+                if (address12 != null && isSoap12)
+                {
+                    return address12.Location;
+                }
+            }
+            return null;
+        }
+
+        private static string GetSoapAction(OperationBinding operation)
+        {
+            foreach (object extension in operation.Extensions)
+            {
+                var soap = extension as SoapOperationBinding;
+                if (soap != null)
+                {
+                    return soap.SoapAction;
+                }
+                var soap12 = extension as Soap12OperationBinding;
+                if (soap12 != null)
+                {
+                    return soap12.SoapAction;
+                }
+            }
+            return "";
+        }
+
+        private static string GetOperationStyle(OperationBinding operation, SoapBinding soap, Soap12Binding soap12)
+        {
+            foreach (object extension in operation.Extensions)
+            {
+                var soapOperation = extension as SoapOperationBinding;
+                if (soapOperation != null && soapOperation.Style != SoapBindingStyle.Default)
+                {
+                    return soapOperation.Style.ToString();
+                }
+                var soap12Operation = extension as Soap12OperationBinding;
+                if (soap12Operation != null && soap12Operation.Style != SoapBindingStyle.Default)
+                {
+                    return soap12Operation.Style.ToString();
+                }
+            }
+            if (soap12 != null && soap12.Style != SoapBindingStyle.Default)
+            {
+                return soap12.Style.ToString();
+            }
+            return soap != null ? soap.Style.ToString() : "Document";
+        }
+
+        private static XmlElement CreateRequestElement(MessagePart part, XmlSchemaSet schemas, string targetNamespace)
+        {
+            var document = new XmlDocument();
+            if (!part.Element.IsEmpty)
+            {
+                var declaration = schemas.GlobalElements[part.Element] as XmlSchemaElement;
+                return declaration == null ? document.CreateElement(part.Element.Name, part.Element.Namespace) :
+                    CreateElement(document, declaration, schemas, 0);
+            }
+
+            XmlElement element = document.CreateElement(part.Name, targetNamespace ?? "");
+            XmlSchemaType type = schemas.GlobalTypes[part.Type] as XmlSchemaType;
+            if (type != null)
+            {
+                AppendTypeContent(document, element, type, schemas, 0);
+            }
+            return element;
+        }
+
+        private static XmlElement CreateElement(XmlDocument document, XmlSchemaElement declaration,
+            XmlSchemaSet schemas, int depth)
+        {
+            if (depth > 12)
+            {
+                return document.CreateElement(declaration.Name ?? "Item");
+            }
+            if (!declaration.RefName.IsEmpty)
+            {
+                declaration = schemas.GlobalElements[declaration.RefName] as XmlSchemaElement ?? declaration;
+            }
+            string name = declaration.Name ?? declaration.RefName.Name ?? "Item";
+            string ns = declaration.QualifiedName.Namespace ?? "";
+            XmlElement element = document.CreateElement(name, ns);
+            XmlSchemaType type = declaration.ElementSchemaType;
+            if (type != null)
+            {
+                AppendTypeContent(document, element, type, schemas, depth + 1);
+            }
+            return element;
+        }
+
+        private static void AppendTypeContent(XmlDocument document, XmlElement element, XmlSchemaType type,
+            XmlSchemaSet schemas, int depth)
+        {
+            var complexType = type as XmlSchemaComplexType;
+            if (complexType == null || depth > 12)
+            {
+                return;
+            }
+            XmlSchemaParticle particle = complexType.ContentTypeParticle;
+            AppendParticle(document, element, particle, schemas, depth + 1);
+            foreach (XmlSchemaAttribute attribute in complexType.Attributes)
+            {
+                if (!string.IsNullOrEmpty(attribute.Name) && attribute.Use == XmlSchemaUse.Required)
+                {
+                    element.SetAttribute(attribute.Name, "");
+                }
+            }
+        }
+
+        private static void AppendParticle(XmlDocument document, XmlElement parent, XmlSchemaParticle particle,
+            XmlSchemaSet schemas, int depth)
+        {
+            if (particle == null || depth > 12)
+            {
+                return;
+            }
+            var element = particle as XmlSchemaElement;
+            if (element != null)
+            {
+                parent.AppendChild(CreateElement(document, element, schemas, depth));
+                return;
+            }
+            var groupReference = particle as XmlSchemaGroupRef;
+            if (groupReference != null)
+            {
+                XmlSchemaGroup schemaGroup = FindSchemaGroup(schemas, groupReference.RefName);
+                if (schemaGroup != null)
+                {
+                    AppendParticle(document, parent, schemaGroup.Particle, schemas, depth + 1);
+                }
+                return;
+            }
+            var group = particle as XmlSchemaGroupBase;
+            if (group != null)
+            {
+                int count = group is XmlSchemaChoice ? Math.Min(1, group.Items.Count) : group.Items.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    AppendParticle(document, parent, group.Items[i] as XmlSchemaParticle, schemas, depth + 1);
+                }
+            }
+        }
+
+        private static XmlSchemaGroup FindSchemaGroup(XmlSchemaSet schemas, XmlQualifiedName name)
+        {
+            foreach (XmlSchema schema in schemas.Schemas())
+            {
+                if (schema.TargetNamespace == name.Namespace)
+                {
+                    var group = schema.Groups[name.Name] as XmlSchemaGroup;
+                    if (group != null)
+                    {
+                        return group;
+                    }
+                }
+            }
+            return null;
         }
 
         private void GetPaths(StringCollection localPaths, StringCollection urls)
@@ -792,31 +664,13 @@ namespace WebServiceStudio
             return obj2;
         }
 
-        public static XmlSchema ReadSchema(string filename)
-        {
-            var reader = new XmlTextReader(filename);
-            if (reader.IsStartElement("schema", "http://www.w3.org/2001/XMLSchema"))
-            {
-                return XmlSchema.Read(reader, null);
-            }
-            return null;
-        }
-
         public void Reset()
         {
             paths.Clear();
-            codeProvider = null;
             wsdls.Clear();
             xsds.Clear();
-            compileUnit = null;
-            proxyAssembly = null;
-            proxyCode = null;
+            operations.Clear();
             cancelled = false;
-        }
-
-        private void ValidationCallbackWithErrorCode(object sender, ValidationEventArgs args)
-        {
-            CheckPoint(MessageType.Warning, "Schema parsing error " + args.Message);
         }
 
         internal class Namespace
